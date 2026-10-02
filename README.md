@@ -4,6 +4,8 @@
 langue de l'appelant : prise de rendez-vous atelier dans le DMS, suivi de réparation, qualification des leads VN/VO
 et essais, transfert intelligent, rappels, campagnes sortantes — et un tableau de bord pour piloter l'impact.
 
+**En ligne : https://ossian-ai.vercel.app** (Vercel, région Paris `cdg1`, déploiement automatique à chaque push).
+
 | | |
 |---|---|
 | `/` | Site marketing |
@@ -23,6 +25,12 @@ Sans `ANTHROPIC_API_KEY`, tout fonctionne en **mode simulé** (agent à règles,
 pour une démo hors ligne. Avec la clé, l'agent et l'analyse d'onboarding tournent sur Claude en temps réel.
 La démo vocale utilise la reconnaissance vocale du navigateur (Chrome, Edge ou Safari) ; ajoutez
 `ELEVENLABS_API_KEY` pour une voix premium.
+
+## Activer l'IA en production
+
+Dans Vercel → projet `ossian-ai` → *Settings → Environment Variables*, ajoutez `ANTHROPIC_API_KEY`
+(et optionnellement `ELEVENLABS_API_KEY` pour la voix premium), puis redéployez. Le badge de `/demo` passe
+de « Mode simulé » à « IA en direct ».
 
 ## Stack
 
