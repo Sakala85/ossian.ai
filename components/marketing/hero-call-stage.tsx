@@ -56,7 +56,7 @@ export function HeroCallStage() {
     >
       {/* Orb */}
       <div className="relative flex flex-col items-center lg:absolute lg:top-1/2 lg:left-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2">
-        <div className="relative size-[248px] sm:size-[300px] lg:size-[380px]">
+        <div className="relative size-[248px] sm:size-[300px] lg:size-[360px]">
           <div aria-hidden className="absolute inset-[14%] rounded-full bg-primary/25 blur-3xl" />
           <div
             aria-hidden
@@ -66,14 +66,12 @@ export function HeroCallStage() {
             aria-hidden
             className="absolute inset-[-18%] hidden rounded-full border border-border/60 [mask-image:linear-gradient(to_bottom,#000,transparent_70%)] sm:block"
           />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 scale-[0.6526] sm:scale-[0.7895] lg:scale-100">
-            <LiveOrb state={ORB_STATE[step]} size={380} />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 scale-[0.6889] sm:scale-[0.8333] lg:scale-100">
+            <LiveOrb state={ORB_STATE[step]} size={360} />
           </div>
         </div>
         <div
-          className="mt-1 inline-flex h-7 items-center gap-2 rounded-full border border-border bg-card/70 px-3 text-xs text-muted-foreground backdrop-blur lg:-mt-6"
-          aria-live="polite"
-        >
+          className="mt-1 inline-flex h-7 items-center gap-2 rounded-full border border-border bg-card/70 px-3 text-xs text-muted-foreground backdrop-blur lg:-mt-6">
           <span
             className={cn(
               "size-1.5 rounded-full transition-colors",
@@ -179,7 +177,7 @@ function TranscriptCard({ step }: { step: number }) {
         </div>
       </div>
 
-      <div className="relative h-[268px] px-3.5 pb-3.5 [mask-image:linear-gradient(to_bottom,transparent,#000_22%)]">
+      <div className="relative h-[272px] overflow-hidden px-3.5 pb-3.5 [mask-image:linear-gradient(to_bottom,transparent,#000_24%)]">
         <motion.ul layout className="flex h-full flex-col justify-end gap-2" aria-label="Transcription de l'appel en cours">
           <AnimatePresence initial={false} mode="popLayout">
             {visible.map((l) => (
@@ -278,8 +276,8 @@ function ToolEventCard({ step }: { step: number }) {
                 <Check className="size-4" strokeWidth={3} />
               </motion.span>
               <div className="leading-tight">
-                <p className="text-[13.5px] font-medium">RDV créé · jeudi 8h30</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">Révision 60 000 km · Karim B.</p>
+                <p className="text-[13px] font-medium">RDV créé · jeudi 8h30 · Karim B.</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Révision 60 000 km · courtoisie</p>
               </div>
             </div>
             <div className="flex items-center justify-between border-t border-border pt-2.5 font-mono text-[10.5px] text-muted-foreground">

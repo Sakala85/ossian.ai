@@ -11,7 +11,7 @@ function formatNumber(n: number, decimals: number) {
     f = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     formatters.set(decimals, f);
   }
-  return f.format(n);
+  return f.format(n).replace(/\u202f/g, "\u00a0");
 }
 
 /**

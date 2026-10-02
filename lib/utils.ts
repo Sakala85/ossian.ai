@@ -5,14 +5,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const euro = (n: number, digits = 0) =>
-  new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: digits }).format(n);
+// fr-FR uses a narrow no-break space (U+202F) as thousands separator, which nearly
+// disappears with tight display tracking; use a regular no-break space instead.
+const nbsp = (s: string) => s.replace(/\u202f/g, "\u00a0");
 
-export const num = (n: number, digits = 0) =>
-  new Intl.NumberFormat("fr-FR", { maximumFractionDigits: digits }).format(n);
+export const euro = (n: number, digits = 0) =>
+  nbsp(new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: digits }).format(n));
+
+export const num = (n: number, digits = 0) => nbsp(new Intl.NumberFormat("fr-FR", { maximumFractionDigits: digits }).format(n));
 
 export const pct = (n: number, digits = 0) =>
-  new Intl.NumberFormat("fr-FR", { style: "percent", maximumFractionDigits: digits }).format(n);
+  nbsp(new Intl.NumberFormat("fr-FR", { style: "percent", maximumFractionDigits: digits }).format(n));
 
 export function duration(seconds: number) {
   const m = Math.floor(seconds / 60);

@@ -60,11 +60,13 @@ export function UrlScanMock() {
         {scanning && (
           <motion.div
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 h-10 bg-gradient-to-b from-transparent via-primary/15 to-transparent"
-            initial={{ top: "-20%" }}
-            animate={{ top: "100%" }}
+            className="pointer-events-none absolute inset-0"
+            initial={{ y: "-100%" }}
+            animate={{ y: "100%" }}
             transition={{ duration: 1.3, repeat: Infinity, ease: "linear" }}
-          />
+          >
+            <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-b from-transparent via-primary/15 to-transparent" />
+          </motion.div>
         )}
         <ul className="relative grid gap-2">
           {FOUND.map((f, i) => (
@@ -114,8 +116,9 @@ export function AgentConfigMock() {
           {[0.5, 0.9, 0.6, 1, 0.4, 0.8, 0.55].map((h, i) => (
             <motion.span
               key={i}
-              className="w-[2px] rounded-full bg-primary"
-              animate={{ height: [`${h * 40}%`, `${h * 100}%`, `${h * 40}%`] }}
+              className="w-[2px] origin-bottom rounded-full bg-primary"
+              style={{ height: `${h * 100}%` }}
+              animate={{ scaleY: [0.4, 1, 0.4] }}
               transition={{ duration: 0.9 + i * 0.07, repeat: Infinity, ease: "easeInOut" }}
             />
           ))}
@@ -226,11 +229,13 @@ export function StepsBeam() {
     <div aria-hidden className="pointer-events-none absolute top-5 right-0 left-5 hidden h-px overflow-hidden md:block">
       <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--border-strong)_0%,var(--border-strong)_80%,transparent)]" />
       <motion.div
-        className="absolute top-1/2 h-px w-28 -translate-y-1/2 bg-gradient-to-r from-transparent via-primary to-transparent"
-        initial={{ left: "-10%" }}
-        animate={{ left: "100%" }}
-        transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", repeatDelay: 0.8 }}
-      />
+        className="absolute inset-0"
+        initial={{ x: "-100%" }}
+        animate={{ x: "100%" }}
+        transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut", repeatDelay: 0.8 }}
+      >
+        <div className="absolute top-0 right-0 h-px w-28 bg-gradient-to-r from-transparent via-primary to-transparent" />
+      </motion.div>
     </div>
   );
 }

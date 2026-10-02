@@ -148,7 +148,7 @@ function TranscriptPanel({ scenario }: { scenario: ShowcaseScenario }) {
         </div>
       </div>
 
-      <ol className="grid gap-3 p-4 sm:p-5" aria-label="Transcription">
+      <ol className="grid grid-cols-[minmax(0,1fr)] gap-3 p-4 sm:p-5" aria-label="Transcription">
         {scenario.turns.map((t, i) => (
           <motion.li
             key={i}

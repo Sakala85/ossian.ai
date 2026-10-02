@@ -251,13 +251,15 @@ function Node({ label, children }: { label: string; children: React.ReactNode })
 
 function Wire({ delay = 0 }: { delay?: number }) {
   return (
-    <span className="relative mb-5 h-px flex-1 overflow-hidden bg-[repeating-linear-gradient(90deg,var(--border-strong)_0_4px,transparent_4px_8px)]">
+    <span className="relative mb-5 h-px flex-1 bg-[repeating-linear-gradient(90deg,var(--border-strong)_0_4px,transparent_4px_8px)]">
       <motion.span
-        className="absolute top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_10px_2px_color-mix(in_oklch,var(--primary)_60%,transparent)]"
-        initial={{ left: "-6%" }}
-        animate={{ left: "106%" }}
+        className="absolute inset-0"
+        initial={{ x: "-100%" }}
+        animate={{ x: "0%" }}
         transition={{ duration: 1.8, delay, repeat: Infinity, repeatDelay: 0.6, ease: "easeInOut" }}
-      />
+      >
+        <span className="absolute top-1/2 right-0 size-1.5 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_10px_2px_color-mix(in_oklch,var(--primary)_60%,transparent)]" />
+      </motion.span>
     </span>
   );
 }
