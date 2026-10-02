@@ -31,11 +31,13 @@ type Step = "intro" | "working" | "done" | "manage";
 
 export function ConnectModal({
   integration,
+  open,
   onClose,
   onConnected,
   onDisconnect,
 }: {
   integration: Integration | null;
+  open: boolean;
   onClose: () => void;
   onConnected: (id: string) => void;
   onDisconnect: (id: string) => void;
@@ -44,16 +46,20 @@ export function ConnectModal({
   const [key, setKey] = useState("");
   const [account, setAccount] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const id = integration?.id;
+  const connectedAtOpen = integration?.status === "connecte";
 
+  // Reset the flow each time the modal opens (not when the status changes mid-flow).
   useEffect(() => {
-    if (integration) {
-      setStep(integration.status === "connecte" ? "manage" : "intro");
+    if (open && id) {
+      setStep(connectedAtOpen ? "manage" : "intro");
       setKey("");
       setAccount("");
     }
-  }, [integration]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, id]);
 
-  if (!integration) return <Modal open={false} onClose={onClose} label="" children={null} />;
+  if (!integration) return null;
   const it = integration;
   const oauth = OAUTH.has(it.category) && it.id !== "email";
 
@@ -66,7 +72,7 @@ export function ConnectModal({
   };
 
   return (
-    <Modal open={!!integration} onClose={onClose} label={`Connecter ${it.name}`} className="max-w-md">
+    <Modal open={open} onClose={onClose} label={`Connecter ${it.name}`} className="max-w-md">
       <OverlayHeader title={step === "manage" ? it.name : `Connecter ${it.name}`} description={it.category} onClose={onClose} />
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-5">
         {/* Handshake visual */}
