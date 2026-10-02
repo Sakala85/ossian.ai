@@ -40,6 +40,7 @@ export function StepDealership({
   const [error, setError] = useState<string | null>(null);
   const normalized = normalizeUrl(input.url);
   const derivedName = normalized ? nameFromUrl(normalized) : "";
+  const resumeStep = resume ? (resume.step > 1 ? resume.step : resume.maxStep) : 1;
 
   useEffect(() => {
     // Autofocus on larger screens only (avoids popping the keyboard on phones).
@@ -76,7 +77,7 @@ export function StepDealership({
               Reprendre la configuration{resume.profile.name ? ` de ${resume.profile.name}` : ""}
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              {STEPS.find((s) => s.id === resume.step)?.label} · étape {resume.step} sur {TOTAL_STEPS} · enregistrée {timeAgo(resume.savedAt)}
+              {STEPS.find((s) => s.id === resumeStep)?.label} · étape {resumeStep} sur {TOTAL_STEPS} · enregistrée {timeAgo(resume.savedAt)}
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={onResume}>

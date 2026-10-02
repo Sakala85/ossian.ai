@@ -24,7 +24,7 @@ import { Orb } from "@/components/voice/orb";
 import type { DealershipProfile } from "@/lib/domain/types";
 import { ANALYZE_STEPS, type AnalyzeStepId } from "@/lib/onboarding/types";
 import { cn } from "@/lib/utils";
-import { EASE, TOTAL_STEPS, hostOf, plural, summaryParts, type ProfileSource } from "./lib";
+import { EASE, TOTAL_STEPS, hostOf, normalizeProfile, plural, summaryParts, type ProfileSource } from "./lib";
 import { chipsFromDetail, type AnalysisState, type FoundItem, type StepStatus } from "./use-analyze";
 
 const STEP_ICONS: Record<AnalyzeStepId, typeof Globe> = {
@@ -96,7 +96,8 @@ export function StepAnalyze({
   onEditUrl: () => void;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const restored = analysis.status === "idle" && ready;
+  // Revisiting the step after a reload: the analysis itself is gone, show the result from the profile.
+  const restored = analysis.status === "idle" && ready && (source === "ai" || source === "simulated");
   const phase: "running" | "done" | "error" | "empty" =
     analysis.status === "running" ? "running" : analysis.status === "error" ? "error" : analysis.status === "done" || restored ? "done" : "empty";
   const host = hostOf(analysis.url || url || profile.website);
@@ -119,6 +120,8 @@ export function StepAnalyze({
   const runningCount = ANALYZE_STEPS.filter((s) => statusOf(s.id) === "running").length;
   const pct = phase === "done" ? 100 : Math.round(((doneCount + runningCount * 0.45) / ANALYZE_STEPS.length) * 100);
   const found = restored ? feedFromProfile(profile) : analysis.found;
+  // The streamed profile is applied by the wizard one render later: summarise it directly to avoid a "0 site" flash.
+  const summary = ready || !analysis.profile ? profile : normalizeProfile(analysis.profile);
   const mode = analysis.mode ?? (source === "simulated" ? "simulated" : source === "ai" ? "ai" : undefined);
 
   const title =
@@ -181,7 +184,7 @@ export function StepAnalyze({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] font-medium text-foreground">
-                  Nous avons trouvé : <span className="tabular">{summaryParts(profile).join(" · ")}</span>
+                  Nous avons trouvé : <span className="tabular">{summaryParts(summary).join(" · ")}</span>
                 </p>
                 <p className="mt-1 text-[13px] text-muted-foreground">Vérifiez-les avant de choisir la voix de votre agent.</p>
                 {mode === "simulated" && (

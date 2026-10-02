@@ -201,7 +201,7 @@ export function StepReview({
                 aria-invalid={!!nameError}
                 aria-describedby={nameError ? `${nameId}-error` : undefined}
                 className={cn(nameError && "border-danger focus:border-danger focus:ring-danger-soft")}
-                onChange={(e) => edit("name", (d) => void (d.name = e.target.value))}
+                onChange={({ target: { value } }) => edit("name", (d) => void (d.name = value))}
               />
             </FormField>
             <FormField id={`${ids}-group`} label="Groupe" optional ai={isAi("group") && !!profile.group}>
@@ -209,7 +209,7 @@ export function StepReview({
                 id={`${ids}-group`}
                 value={profile.group ?? ""}
                 placeholder="Groupe Dupont"
-                onChange={(e) => edit("group", (d) => void (d.group = e.target.value || undefined))}
+                onChange={({ target: { value } }) => edit("group", (d) => void (d.group = value || undefined))}
               />
             </FormField>
             <FormField id={`${ids}-web`} label="Site web" optional className="sm:col-span-2">
@@ -220,7 +220,7 @@ export function StepReview({
                 spellCheck={false}
                 placeholder="https://garage-dupont.fr"
                 className="font-mono text-[13px]"
-                onChange={(e) => edit("website", (d) => void (d.website = e.target.value || undefined))}
+                onChange={({ target: { value } }) => edit("website", (d) => void (d.website = value || undefined))}
               />
             </FormField>
             <FormField id={`${ids}-desc`} label="Présentation" optional ai={isAi("description") && !!profile.description} className="sm:col-span-2">
@@ -229,7 +229,7 @@ export function StepReview({
                 value={profile.description ?? ""}
                 placeholder="Concession multimarque : ventes VN / VO, atelier toutes marques, carrosserie…"
                 className="min-h-20"
-                onChange={(e) => edit("description", (d) => void (d.description = e.target.value))}
+                onChange={({ target: { value } }) => edit("description", (d) => void (d.description = value))}
               />
             </FormField>
             <FormField
@@ -296,7 +296,7 @@ export function StepReview({
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <FormField id={`${sid}-name`} label="Nom du site" className="sm:col-span-2">
-                        <Input id={`${sid}-name`} value={site.name} placeholder={profile.name || "Nom du site"} onChange={(e) => set((s) => (s.name = e.target.value))} />
+                        <Input id={`${sid}-name`} value={site.name} placeholder={profile.name || "Nom du site"} onChange={({ target: { value } }) => set((s) => (s.name = value))} />
                       </FormField>
                       <FormField id={`${sid}-addr`} label="Adresse">
                         <Input
@@ -305,7 +305,7 @@ export function StepReview({
                           autoComplete="off"
                           placeholder="À compléter"
                           className={cn(isMissing(site.address) && missingClass)}
-                          onChange={(e) => set((s) => (s.address = e.target.value))}
+                          onChange={({ target: { value } }) => set((s) => (s.address = value))}
                         />
                       </FormField>
                       <FormField id={`${sid}-city`} label="Code postal et ville">
@@ -315,7 +315,7 @@ export function StepReview({
                           autoComplete="off"
                           placeholder="69008 Lyon"
                           className={cn(isMissing(site.city) && missingClass)}
-                          onChange={(e) => set((s) => (s.city = e.target.value))}
+                          onChange={({ target: { value } }) => set((s) => (s.city = value))}
                         />
                       </FormField>
                       <FormField id={`${sid}-phone`} label="Téléphone">
@@ -327,7 +327,7 @@ export function StepReview({
                           value={site.phone}
                           placeholder="04 72 00 00 00"
                           className={cn("font-mono text-[13px] tabular", isMissing(site.phone) && missingClass)}
-                          onChange={(e) => set((s) => (s.phone = e.target.value))}
+                          onChange={({ target: { value } }) => set((s) => (s.phone = value))}
                         />
                       </FormField>
                       {profile.brands.length > 0 && (
@@ -388,7 +388,6 @@ export function StepReview({
               <span>Service</span>
               <span>Horaires</span>
             </div>
-            <AnimatePresence initial={false}>
               {profile.hours.map((h, i) => (
                 <motion.div key={i} {...rowMotion} className="flex gap-2">
                   <div className="grid flex-1 gap-2 sm:grid-cols-[11rem_1fr]">
@@ -396,13 +395,13 @@ export function StepReview({
                       aria-label={`Service, plage ${i + 1}`}
                       value={h.label}
                       placeholder="Atelier"
-                      onChange={(e) => edit("hours", (d) => void (d.hours[i]!.label = e.target.value))}
+                      onChange={({ target: { value } }) => edit("hours", (d) => void (d.hours[i]!.label = value))}
                     />
                     <Input
                       aria-label={`Horaires, plage ${i + 1}`}
                       value={h.value}
                       placeholder="Lundi–vendredi 8h–12h et 14h–18h"
-                      onChange={(e) => edit("hours", (d) => void (d.hours[i]!.value = e.target.value))}
+                      onChange={({ target: { value } }) => edit("hours", (d) => void (d.hours[i]!.value = value))}
                     />
                   </div>
                   <RemoveButton
@@ -412,7 +411,6 @@ export function StepReview({
                   />
                 </motion.div>
               ))}
-            </AnimatePresence>
             <div className="pt-1">
               <AddButton onClick={() => edit("hours", (d) => void d.hours.push({ label: "", value: "" }))}>Ajouter une plage</AddButton>
             </div>
@@ -435,7 +433,6 @@ export function StepReview({
               <span>Durée</span>
               <span>À partir de</span>
             </div>
-            <AnimatePresence initial={false}>
               {profile.services.map((s, i) => (
                 <motion.div key={i} {...rowMotion} className="flex gap-2">
                   <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-[1fr_6.5rem_7.5rem]">
@@ -444,7 +441,7 @@ export function StepReview({
                       value={s.name}
                       placeholder="Révision constructeur"
                       className="col-span-2 sm:col-span-1"
-                      onChange={(e) => edit("services", (d) => void (d.services[i]!.name = e.target.value))}
+                      onChange={({ target: { value } }) => edit("services", (d) => void (d.services[i]!.name = value))}
                     />
                     <UnitInput
                       unit="min"
@@ -454,7 +451,7 @@ export function StepReview({
                       step={5}
                       aria-label={`Durée de ${s.name || `la prestation ${i + 1}`}, en minutes`}
                       value={s.durationMin || ""}
-                      onChange={(e) => edit("services", (d) => void (d.services[i]!.durationMin = Math.max(0, Number(e.target.value) || 0)))}
+                      onChange={({ target: { value } }) => edit("services", (d) => void (d.services[i]!.durationMin = Math.max(0, Number(value) || 0)))}
                     />
                     <UnitInput
                       unit="€"
@@ -464,9 +461,9 @@ export function StepReview({
                       aria-label={`Prix à partir de, ${s.name || `prestation ${i + 1}`}, en euros`}
                       placeholder="Devis"
                       value={s.priceFrom ?? ""}
-                      onChange={(e) =>
+                      onChange={({ target: { value } }) =>
                         edit("services", (d) => {
-                          const v = e.target.value;
+                          const v = value;
                           d.services[i]!.priceFrom = v === "" ? undefined : Math.max(0, Number(v) || 0);
                         })
                       }
@@ -479,7 +476,6 @@ export function StepReview({
                   />
                 </motion.div>
               ))}
-            </AnimatePresence>
             <p className="pt-1 text-xs text-muted-foreground">Prix indicatifs annoncés « à partir de ». Laissez vide pour « sur devis », 0 pour une prestation offerte.</p>
             <div className="pt-1">
               <AddButton onClick={() => edit("services", (d) => void d.services.push({ name: "", durationMin: 60 }))}>Ajouter une prestation</AddButton>
@@ -502,19 +498,18 @@ export function StepReview({
             <p className="text-[13px] text-muted-foreground">
               Quand l&apos;appelant demande un conseiller, l&apos;agent transfère vers ces numéros pendant leurs horaires — et programme un rappel sinon.
             </p>
-            <AnimatePresence initial={false}>
               {profile.departments.map((dep, i) => {
                 const did = `${ids}-dep-${i}`;
                 return (
-                  <motion.div key={`${dep.key}-${i}`} {...rowMotion} className="rounded-lg border border-border bg-subtle p-4">
+                  <motion.div key={`dep-${i}`} {...rowMotion} className="rounded-lg border border-border bg-subtle p-4">
                     <div className="mb-3 flex items-center gap-2">
                       <Select
                         aria-label="Type de service"
                         value={dep.key}
                         className="h-8 w-auto max-w-[70%] text-[13px]"
-                        onChange={(e) =>
+                        onChange={({ target: { value } }) =>
                           edit("departments", (d) => {
-                            const k = e.target.value as DepartmentKey;
+                            const k = value as DepartmentKey;
                             const x = d.departments[i]!;
                             if (!x.label || x.label === DEPARTMENTS[x.key]) x.label = DEPARTMENTS[k];
                             x.key = k;
@@ -539,7 +534,7 @@ export function StepReview({
                           id={`${did}-label`}
                           value={dep.label}
                           placeholder={DEPARTMENTS[dep.key]}
-                          onChange={(e) => edit("departments", (d) => void (d.departments[i]!.label = e.target.value))}
+                          onChange={({ target: { value } }) => edit("departments", (d) => void (d.departments[i]!.label = value))}
                         />
                       </FormField>
                       <FormField id={`${did}-phone`} label="Numéro de transfert">
@@ -551,7 +546,7 @@ export function StepReview({
                           value={dep.phone}
                           placeholder="04 72 00 00 00"
                           className={cn("font-mono text-[13px] tabular", isMissing(dep.phone) && missingClass)}
-                          onChange={(e) => edit("departments", (d) => void (d.departments[i]!.phone = e.target.value))}
+                          onChange={({ target: { value } }) => edit("departments", (d) => void (d.departments[i]!.phone = value))}
                         />
                       </FormField>
                       <FormField id={`${did}-hours`} label="Joignable" className="sm:col-span-2">
@@ -559,14 +554,13 @@ export function StepReview({
                           id={`${did}-hours`}
                           value={dep.hours}
                           placeholder="Lun–ven 8h–18h"
-                          onChange={(e) => edit("departments", (d) => void (d.departments[i]!.hours = e.target.value))}
+                          onChange={({ target: { value } }) => edit("departments", (d) => void (d.departments[i]!.hours = value))}
                         />
                       </FormField>
                     </div>
                   </motion.div>
                 );
               })}
-            </AnimatePresence>
             <AddButton
               onClick={() =>
                 edit("departments", (d) => void d.departments.push({ key: freeKey, label: DEPARTMENTS[freeKey], phone: "", hours: "" }))
@@ -593,19 +587,17 @@ export function StepReview({
                 <p className="text-[13px] font-medium text-foreground">Règles et politiques</p>
                 <p className="text-xs text-muted-foreground">Ce que l&apos;agent doit savoir et respecter : véhicule de courtoisie, paiement, garanties…</p>
               </div>
-              <AnimatePresence initial={false}>
                 {profile.policies.map((x, i) => (
                   <motion.div key={i} {...rowMotion} className="flex gap-2">
                     <Textarea
                       aria-label={`Règle ${i + 1}`}
                       value={x}
                       className="min-h-16 flex-1"
-                      onChange={(e) => edit("policies", (d) => void (d.policies[i] = e.target.value))}
+                      onChange={({ target: { value } }) => edit("policies", (d) => void (d.policies[i] = value))}
                     />
                     <RemoveButton className="mt-1" label={`Supprimer la règle ${i + 1}`} onClick={() => edit("policies", (d) => void d.policies.splice(i, 1))} />
                   </motion.div>
                 ))}
-              </AnimatePresence>
               <div className="pt-1">
                 <AddButton onClick={() => edit("policies", (d) => void d.policies.push(""))}>Ajouter une règle</AddButton>
               </div>
@@ -616,7 +608,6 @@ export function StepReview({
                 <p className="text-[13px] font-medium text-foreground">Questions fréquentes</p>
                 <p className="text-xs text-muted-foreground">Réponses que l&apos;agent peut donner mot pour mot.</p>
               </div>
-              <AnimatePresence initial={false}>
                 {profile.faq.map((f, i) => (
                   <motion.div key={i} {...rowMotion} className="flex gap-2">
                     <div className="grid flex-1 gap-2 rounded-lg border border-border bg-subtle p-3">
@@ -625,20 +616,19 @@ export function StepReview({
                         value={f.q}
                         placeholder="Proposez-vous un véhicule de courtoisie ?"
                         className="font-medium"
-                        onChange={(e) => edit("faq", (d) => void (d.faq[i]!.q = e.target.value))}
+                        onChange={({ target: { value } }) => edit("faq", (d) => void (d.faq[i]!.q = value))}
                       />
                       <Textarea
                         aria-label={`Réponse ${i + 1}`}
                         value={f.a}
                         placeholder="Oui, sur réservation…"
                         className="min-h-16"
-                        onChange={(e) => edit("faq", (d) => void (d.faq[i]!.a = e.target.value))}
+                        onChange={({ target: { value } }) => edit("faq", (d) => void (d.faq[i]!.a = value))}
                       />
                     </div>
                     <RemoveButton className="mt-1" label={`Supprimer la question ${i + 1}`} onClick={() => edit("faq", (d) => void d.faq.splice(i, 1))} />
                   </motion.div>
                 ))}
-              </AnimatePresence>
               <div className="pt-1">
                 <AddButton onClick={() => edit("faq", (d) => void d.faq.push({ q: "", a: "" }))}>Ajouter une question</AddButton>
               </div>

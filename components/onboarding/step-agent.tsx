@@ -129,7 +129,7 @@ export function StepAgent({
               value={a.name}
               maxLength={24}
               placeholder={currentVoice.name}
-              onChange={(e) => update((d) => void (d.agent.name = e.target.value))}
+              onChange={({ target: { value } }) => update((d) => void (d.agent.name = value))}
             />
           </div>
           <div role="radiogroup" aria-label="Voix de l'agent" className="grid gap-3 sm:grid-cols-2">
@@ -275,7 +275,7 @@ export function StepAgent({
               value={a.greeting}
               maxLength={300}
               className="min-h-24 pl-9 text-[15px]"
-              onChange={(e) => update((d) => void (d.agent.greeting = e.target.value))}
+              onChange={({ target: { value } }) => update((d) => void (d.agent.greeting = value))}
             />
           </div>
           <p className="mt-1.5 text-right font-mono text-[11px] text-muted-foreground tabular">{a.greeting.length} / 300</p>
@@ -327,7 +327,7 @@ export function StepAgent({
             value={a.customInstructions ?? ""}
             placeholder="Ex. : ne proposez pas de rendez-vous carrosserie le samedi ; orientez les demandes de flotte vers Marc Dubois."
             className="min-h-20"
-            onChange={(e) => update((d) => void (d.agent.customInstructions = e.target.value || undefined))}
+            onChange={({ target: { value } }) => update((d) => void (d.agent.customInstructions = value || undefined))}
           />
         </Block>
       </div>

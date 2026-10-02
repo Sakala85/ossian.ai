@@ -108,22 +108,14 @@ export function AgentPreview({
 
       <div className="border-t border-border px-4 py-4">
         <p className="mb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Message d&apos;accueil</p>
-        <motion.p
-          key={greeting}
-          initial={{ opacity: 0.4 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-          className="text-[13px] leading-relaxed text-pretty text-foreground"
-        >
-          « {greeting} »
-        </motion.p>
+        <p className="text-[13px] leading-relaxed text-pretty text-foreground">« {greeting} »</p>
       </div>
 
       <dl className="grid grid-cols-3 divide-x divide-border border-t border-border">
         {stats.map((s) => (
           <div key={s.label} className="flex flex-col-reverse px-3 py-3 text-center">
             <dt className="text-[11px] text-muted-foreground">{s.label}</dt>
-            <dd className="font-mono text-lg font-medium text-foreground tabular">
+            <dd className="relative font-mono text-lg font-medium text-foreground tabular">
               {ready ? (
                 <Live value={s.value} />
               ) : analyzing ? (
