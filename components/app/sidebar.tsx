@@ -1,6 +1,6 @@
 "use client";
 
-import { Building, Check, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Plus, Settings } from "lucide-react";
+import { Building, Check, ChevronsUpDown, LogOut, PanelLeftClose, PanelLeftOpen, Plus, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo, LogoMark } from "@/components/brand/logo";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { MiniOrb } from "./mini-orb";
 import { NAV_CONFIG, NAV_MAIN, isActive, type NavItem } from "./nav";
 import { MenuItem, MenuLabel, Popover } from "./popover";
+import { useShell } from "./shell-context";
 
 export type SiteFilter = "all" | "lyon-est" | "villeurbanne" | "bron";
 
@@ -53,6 +54,7 @@ export function Sidebar({
   onSiteChange: (s: SiteFilter) => void;
 }) {
   const pathname = usePathname() ?? "/app";
+  const { workspace } = useShell();
   const r = mobile ? FULL : RAIL;
   const current = SITE_OPTIONS.find((s) => s.value === site) ?? SITE_OPTIONS[0]!;
 
@@ -96,17 +98,37 @@ export function Sidebar({
               )}
             >
               <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-foreground text-[11px] font-semibold tracking-tight text-background">
-                GM
+                {workspace.initials}
               </span>
               <span className={cn("min-w-0 flex-1", r.hide)}>
-                <span className="block truncate text-[13px] leading-tight font-medium">Groupe Mistral</span>
-                <span className="block truncate text-xs leading-tight text-muted-foreground">{current.label}</span>
+                <span className="block truncate text-[13px] leading-tight font-medium">{workspace.name}</span>
+                <span className="block truncate text-xs leading-tight text-muted-foreground">{workspace.subtitle ?? current.label}</span>
               </span>
               <ChevronsUpDown className={cn("size-3.5 shrink-0 text-muted-foreground", r.hide)} />
             </button>
           )}
         >
-          {(close) => (
+          {(close) =>
+            workspace.live ? (
+              <>
+                <MenuLabel>Concession</MenuLabel>
+                <MenuItem onClick={close}>
+                  <Building />
+                  <span className="flex-1">
+                    <span className="block">{workspace.name}</span>
+                    {workspace.subtitle && <span className="block text-xs text-muted-foreground">{workspace.subtitle}</span>}
+                  </span>
+                  <Check className="!text-primary" />
+                </MenuItem>
+                <div className="my-1 h-px bg-border" />
+                <a
+                  href="/acces/sortie"
+                  className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [&_svg]:size-4"
+                >
+                  <LogOut /> Se déconnecter de cet appareil
+                </a>
+              </>
+            ) : (
             <>
               <MenuLabel>Sites</MenuLabel>
               {SITE_OPTIONS.map((s) => (
@@ -144,7 +166,8 @@ export function Sidebar({
                 <Plus /> Nouvel espace de travail
               </button>
             </>
-          )}
+            )
+          }
         </Popover>
       </div>
 
@@ -179,12 +202,18 @@ export function Sidebar({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 text-[13px] font-medium">
-                Léa
-                <span className="inline-flex items-center gap-1.5 text-xs font-normal text-success">
-                  <LiveDot className="size-1.5" /> En ligne
-                </span>
+                {workspace.agent.name}
+                {workspace.agent.online ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-normal text-success">
+                    <LiveDot className="size-1.5" /> En ligne
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
+                    <span className="size-1.5 rounded-full bg-warning" /> Renvoi à faire
+                  </span>
+                )}
               </div>
-              <p className="truncate text-xs text-muted-foreground">24h/24 · 7 langues · 3 sites</p>
+              <p className="truncate text-xs text-muted-foreground">{workspace.agent.summary}</p>
             </div>
           </div>
           <LinkButton href="/demo" variant="outline" size="xs" className="mt-3 w-full" onClick={onNavigate}>
@@ -193,11 +222,11 @@ export function Sidebar({
         </div>
         <Link
           href="/demo"
-          title="Léa · En ligne — Tester l'agent"
-          aria-label="Léa est en ligne. Tester l'agent"
+          title={`${workspace.agent.name} · ${workspace.agent.online ? "En ligne" : "Renvoi à faire"} — Tester l'agent`}
+          aria-label={`${workspace.agent.name} : ${workspace.agent.online ? "en ligne" : "renvoi d'appel à faire"}. Tester l'agent`}
           className={cn("mx-auto size-9 items-center justify-center rounded-lg transition-colors hover:bg-muted", r.show)}
         >
-          <MiniOrb size={22} live />
+          <MiniOrb size={22} live={workspace.agent.online} />
         </Link>
       </div>
 
@@ -206,12 +235,12 @@ export function Sidebar({
         <button
           type="button"
           className={cn("flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1 text-left transition-colors hover:bg-muted", !mobile && "md:flex-none lg:flex-1")}
-          title="Claire Fontaine · Directrice APV"
+          title={`${workspace.user} · ${workspace.role}`}
         >
-          <Avatar name="Claire Fontaine" size={28} />
+          <Avatar name={workspace.user} size={28} />
           <span className={cn("min-w-0", r.hide)}>
-            <span className="block truncate text-[13px] leading-tight font-medium">Claire Fontaine</span>
-            <span className="block truncate text-xs leading-tight text-muted-foreground">Directrice APV</span>
+            <span className="block truncate text-[13px] leading-tight font-medium">{workspace.user}</span>
+            <span className="block truncate text-xs leading-tight text-muted-foreground">{workspace.role}</span>
           </span>
         </button>
         <ThemeToggle className={cn("shrink-0", r.hideFlex)} />

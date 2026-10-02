@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { fmtTime } from "@/components/app/format";
 import { Shell } from "@/components/app/shell";
 import { getAllCalls } from "@/lib/demo/data";
+import { getAccount } from "@/lib/server/account";
+import { toCallRecords, workspaceFor } from "@/lib/server/account-view";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +12,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+/**
+ * Dashboard shell. A dealership signed in with its private access link sees its
+ * own workspace and calls; everyone else sees the demo workspace.
+ */
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const now = new Date();
-  const calls = getAllCalls(now);
+  const account = await getAccount();
+  const calls = account ? toCallRecords(account.calls) : getAllCalls(now);
   const liveCount = calls.filter((c) => now.getTime() - new Date(c.startedAt).getTime() < 86_400_000).length;
   const recentCalls = calls.slice(0, 6).map((c) => ({
     id: c.id,
@@ -22,7 +29,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }));
 
   return (
-    <Shell liveCount={liveCount} recentCalls={recentCalls}>
+    <Shell liveCount={liveCount} recentCalls={recentCalls} workspace={account ? workspaceFor(account) : undefined}>
       {children}
     </Shell>
   );

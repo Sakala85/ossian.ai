@@ -37,6 +37,10 @@ export function CallsView({ calls, now, initialId }: { calls: CallRecord[]; now:
   const active = JSON.stringify(f) !== JSON.stringify(EMPTY);
 
   const languages = useMemo(() => [...new Set(calls.map((c) => c.language))], [calls]);
+  const sites = useMemo(() => {
+    const ids = new Set(calls.map((c) => c.siteId));
+    return [...SITES.filter((s) => ids.has(s.id)), ...[...ids].filter((id) => !SITES.some((s) => s.id === id)).map((id) => ({ id, short: siteShort(id) }))];
+  }, [calls]);
 
   const filtered = useMemo(() => {
     const q = norm(f.q);
@@ -129,14 +133,16 @@ export function CallsView({ calls, now, initialId }: { calls: CallRecord[]; now:
             </option>
           ))}
         </Select>
-        <Select aria-label="Site" value={f.site} onChange={(e) => set("site", e.target.value)} className={filterCls}>
-          <option value="">Tous les sites</option>
-          {SITES.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.short}
-            </option>
-          ))}
-        </Select>
+        {sites.length > 1 && (
+          <Select aria-label="Site" value={f.site} onChange={(e) => set("site", e.target.value)} className={filterCls}>
+            <option value="">Tous les sites</option>
+            {sites.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.short}
+              </option>
+            ))}
+          </Select>
+        )}
         <Select aria-label="Langue" value={f.lang} onChange={(e) => set("lang", e.target.value as LanguageCode | "")} className={filterCls}>
           <option value="">Toutes les langues</option>
           {languages.map((l) => (

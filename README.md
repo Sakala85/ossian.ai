@@ -10,8 +10,8 @@ et essais, transfert intelligent, rappels, campagnes sortantes — et un tableau
 |---|---|
 | `/` | Site marketing |
 | `/demo` | **Démo vocale** : appelez l'agent depuis le navigateur (micro) ou par écrit |
-| `/onboarding` | **Onboarding automatique** : URL du site → agent configuré → mise en ligne |
-| `/app` | Tableau de bord (appels, RDV, leads, campagnes, agent, intégrations) |
+| `/onboarding` | **Onboarding en un clic** : URL du site → agent configuré → **Activer** (compte + numéro + accès) → renvoi d'appel vérifié en direct |
+| `/app` | Tableau de bord : données réelles de la concession connectée, démo sinon |
 
 ## Démarrer
 
@@ -35,13 +35,20 @@ de « Mode simulé » à « IA en direct ».
 ## Téléphonie (Vapi)
 
 Ossian répond sur de vrais numéros via **Vapi** (région UE). Mise en service pas à pas :
-[`docs/VAPI.md`](docs/VAPI.md) — en résumé : `OSSIAN_VOICE_SECRET` sur Vercel, puis
-`npm run vapi -- check` et `npm run vapi -- connect <phoneNumberId> --fallback +33…`.
+[`docs/VAPI.md`](docs/VAPI.md) — en résumé : `npm run vapi -- check`, puis `npm run vapi -- pool-add <phoneNumberId>`
+pour chaque numéro du stock. Chaque concession qui s'active sur `/onboarding` reçoit ensuite un numéro
+automatiquement.
+
+## Base de données
+
+Supabase (projet « ossian », région Paris) : schéma multi-tenant + fonctions d'onboarding dans
+`supabase/migrations/`. Variables : `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `OSSIAN_DB_KEY` (clé serveur,
+voir `docs/ARCHITECTURE.md`). Sans ces variables, l'onboarding reste en mode démonstration (local).
 
 ## Stack
 
 Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Motion · Anthropic SDK (Claude) · Zod ·
-Supabase (schéma prêt) · Vapi (adapter téléphonie) · déployé sur Vercel.
+Supabase (Postgres, RPC + RLS) · Vapi (téléphonie) · Resend (e-mails) · déployé sur Vercel.
 
 ## Documentation
 

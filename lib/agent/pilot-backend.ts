@@ -1,6 +1,8 @@
 import type { DealershipProfile } from "@/lib/domain/types";
+import { db, dbEnabled } from "@/lib/server/db";
 import { notifyTeam } from "@/lib/server/notify";
 import { DemoBackend, type AgentBackend } from "./backend";
+import { parisToUtc } from "./time";
 
 /**
  * Backend for REAL phone calls before a DMS/CRM connector is live.
@@ -16,9 +18,19 @@ export class PilotBackend implements AgentBackend {
 
   constructor(
     private profile: DealershipProfile,
-    private ctx: { callId?: string; callerNumber?: string } = {},
+    private ctx: { callId?: string; callerNumber?: string; dealershipId?: string; contactEmail?: string | null } = {},
   ) {
     this.demo = new DemoBackend(profile);
+  }
+
+  /** Persists the event for the dashboard (when the dealership lives in the database). */
+  private async record(kind: "appointment" | "lead" | "callback", data: Record<string, unknown>) {
+    if (!dbEnabled || !this.ctx.dealershipId) return;
+    try {
+      await db.logEvent(this.ctx.dealershipId, kind, { ...data, call_id: this.ctx.callId });
+    } catch (err) {
+      console.error(`[pilot] could not record ${kind}`, err);
+    }
   }
 
   async checkAvailability(i: Parameters<AgentBackend["checkAvailability"]>[0]) {
@@ -42,6 +54,17 @@ export class PilotBackend implements AgentBackend {
       Courtoisie: i.courtesy_vehicle ? "Oui" : "Non",
       Notes: i.notes,
       Appel: this.ctx.callId,
+    }, { email: this.ctx.contactEmail });
+    const [hh, mm] = (time ?? "").split(":").map(Number);
+    await this.record("appointment", {
+      customer_name: i.customer_name,
+      phone: i.phone || this.ctx.callerNumber,
+      vehicle: i.vehicle,
+      plate: i.plate,
+      mileage: i.mileage,
+      service: i.service,
+      starts_at: date && Number.isFinite(hh) ? parisToUtc(date, hh! * 60 + (mm || 0)).toISOString() : undefined,
+      courtesy_vehicle: i.courtesy_vehicle ?? false,
     });
     return {
       ok: true,
@@ -79,6 +102,16 @@ export class PilotBackend implements AgentBackend {
       "Essai souhaité": i.test_drive_slot_id,
       Notes: i.notes,
       Appel: this.ctx.callId,
+    }, { email: this.ctx.contactEmail });
+    await this.record("lead", {
+      name: i.name,
+      phone: i.phone || this.ctx.callerNumber,
+      email: i.email,
+      interest: i.interest,
+      vehicle: i.vehicle_of_interest,
+      budget: i.budget,
+      trade_in: i.trade_in,
+      notes: [i.notes, i.test_drive_slot_id ? `Essai souhaité : ${i.test_drive_slot_id}` : ""].filter(Boolean).join(" · ") || undefined,
     });
     return {
       ok: true,
@@ -91,13 +124,20 @@ export class PilotBackend implements AgentBackend {
   async transferCall(i: Parameters<AgentBackend["transferCall"]>[0]) {
     const r = await this.demo.transferCall(i);
     if (r.status === "transfert_en_cours") {
-      await notifyTeam("transfert", this.profile.name, `Appel transféré — ${r.department}`, { Motif: i.reason, Appelant: this.ctx.callerNumber, Appel: this.ctx.callId });
+      await notifyTeam("transfert", this.profile.name, `Appel transféré — ${r.department}`, { Motif: i.reason, Appelant: this.ctx.callerNumber, Appel: this.ctx.callId }, { email: this.ctx.contactEmail });
     }
     return r;
   }
 
   async scheduleCallback(i: Parameters<AgentBackend["scheduleCallback"]>[0]) {
     const r = await this.demo.scheduleCallback(i);
+    await this.record("callback", {
+      department: i.department,
+      name: i.name,
+      phone: i.phone || this.ctx.callerNumber,
+      reason: [i.reason, i.preferred_time ? `(souhaité : ${i.preferred_time})` : ""].filter(Boolean).join(" "),
+      priority: i.priority,
+    });
     await notifyTeam("rappel", this.profile.name, `Rappel à faire${i.priority === "haute" ? " (PRIORITAIRE)" : ""}`, {
       Service: r.owner,
       Nom: i.name,
@@ -105,7 +145,7 @@ export class PilotBackend implements AgentBackend {
       Motif: i.reason,
       "Moment souhaité": i.preferred_time,
       Appel: this.ctx.callId,
-    });
+    }, { email: this.ctx.contactEmail });
     return r;
   }
 }

@@ -6,10 +6,17 @@
  *   npm run vapi -- numbers                                 List the Vapi phone numbers
  *   npm run vapi -- connect <phoneNumberId> [options]       Route a Vapi number to Ossian
  *   npm run vapi -- import-vonage <+33…> --credential <id>  Import a Vonage number, then connect it
+ *   npm run vapi -- pool-add <phoneNumberId>                Connect a Vapi number and add it to the self-serve pool
+ *   npm run vapi -- pool-status                             Numbers available / assigned in the pool
  *
  * Options for connect / import-vonage:
  *   --fallback <+33…>    Number Vapi forwards to if Ossian is unreachable (the dealership's reception)
  *   --profile <file>     Dealership profile JSON (exported from /demo after onboarding), stored in Redis
+ *   --pool               (import-vonage) add the imported number to the self-serve pool
+ *
+ * Self-serve pool: every number in the pool is handed to the next dealership that
+ * activates on /onboarding (or immediately to one that activated while the pool was
+ * empty). Keep 2–3 numbers available at all times.
  *
  * Environment (read from the shell or .env.local):
  *   VAPI_API_KEY          Vapi private API key
@@ -17,6 +24,7 @@
  *   OSSIAN_BASE_URL       https://ossian-ai.vercel.app (default)
  *   OSSIAN_VOICE_SECRET   Shared secret, identical to the one set on Vercel
  *   UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN (or KV_REST_API_URL / KV_REST_API_TOKEN) for --profile
+ *   SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, OSSIAN_DB_KEY  for pool-add / pool-status (same values as on Vercel)
  */
 import { existsSync, readFileSync } from "node:fs";
 
@@ -32,6 +40,9 @@ const OSSIAN = (process.env.OSSIAN_BASE_URL || "https://ossian-ai.vercel.app").r
 const SECRET = process.env.OSSIAN_VOICE_SECRET;
 const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
+const SUPABASE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const DB_KEY = process.env.OSSIAN_DB_KEY;
 
 const [cmd, ...rest] = process.argv.slice(2);
 const positional = rest.filter((a, i) => !a.startsWith("--") && !rest[i - 1]?.startsWith("--"));
@@ -76,6 +87,41 @@ async function storeProfile(number, file) {
   });
   if (!res.ok) die(`Redis SET → HTTP ${res.status}`);
   ok(`Profil « ${profile.name} » associé à ${number}`);
+}
+
+async function rpc(fn, args = {}) {
+  if (!SUPABASE_URL || !SUPABASE_KEY || !DB_KEY) die("SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY et OSSIAN_DB_KEY sont nécessaires (mêmes valeurs que sur Vercel)");
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_key: DB_KEY, ...args }),
+  });
+  const text = await res.text();
+  if (!res.ok) die(`Supabase ${fn} → HTTP ${res.status}\n${text}`);
+  return text ? JSON.parse(text) : null;
+}
+
+async function poolAdd(phoneNumberId) {
+  const current = await vapi("GET", `/phone-number/${phoneNumberId}`);
+  const number = e164(current.number);
+  if (!number) die(`Le numéro Vapi ${phoneNumberId} n'a pas de numéro E.164 (SIP ?)`);
+  await vapi("PATCH", `/phone-number/${phoneNumberId}`, { ...(current.assistantId ? { assistantId: null } : {}), server: serverConfig() });
+  ok(`${number} → ${OSSIAN}/api/voice/vapi`);
+  const r = await rpc("ossian_pool_add", { p_e164: number, p_vapi_id: phoneNumberId, p_provider: current.provider === "vonage" ? "vonage" : "vapi" });
+  if (r.assigned_to) {
+    const d = r.assigned_to;
+    const fallback = e164(d.fallback);
+    await vapi("PATCH", `/phone-number/${phoneNumberId}`, {
+      name: `Ossian · ${d.name}`.slice(0, 40),
+      ...(fallback ? { fallbackDestination: { type: "number", number: fallback, message: "" } } : {}),
+    });
+    ok(`Attribué immédiatement à « ${d.name} », qui attendait un numéro.`);
+    console.log(`  → Prévenez ${d.email ?? "la concession"} : son numéro ${number} et les codes de renvoi apparaissent déjà dans son tableau de bord.`);
+  } else {
+    ok(`Ajouté au stock (statut : ${r.status}).`);
+  }
+  const s = await rpc("ossian_pool_status");
+  console.log(`\nStock : ${s.available} disponible(s), ${s.assigned} attribué(s).`);
 }
 
 function serverConfig() {
@@ -174,7 +220,18 @@ switch (cmd) {
     if (!number || !opt("credential")) die("Usage : import-vonage <+33…> --credential <vonageCredentialId> [--fallback +33…] [--profile profil.json]");
     const created = await vapi("POST", "/phone-number", { provider: "vonage", number: number.replace(/^\+/, ""), credentialId: opt("credential"), name: `Ossian ${number}` });
     ok(`Numéro Vonage importé : ${created.id}`);
-    await connect(created.id);
+    if (rest.includes("--pool")) await poolAdd(created.id);
+    else await connect(created.id);
+    break;
+  }
+  case "pool-add":
+    if (!positional[0]) die("Usage : pool-add <phoneNumberId>   (ids : npm run vapi -- numbers)");
+    await poolAdd(positional[0]);
+    break;
+  case "pool-status": {
+    const s = await rpc("ossian_pool_status");
+    console.log(`Stock : ${s.available} numéro(s) disponible(s), ${s.assigned} attribué(s).`);
+    if (s.available < 2) console.log("⚠ Moins de 2 numéros disponibles : ajoutez-en avec pool-add pour que les prochaines activations soient instantanées.");
     break;
   }
   default:

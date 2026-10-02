@@ -55,7 +55,7 @@ export function Page({
           </button>
           <nav aria-label="Fil d'Ariane" className="flex min-w-0 items-center gap-1.5 text-[13px]">
             <Link href="/app" className="hidden truncate text-muted-foreground transition-colors hover:text-foreground sm:inline">
-              Groupe Mistral
+              {shell.workspace.name}
             </Link>
             <ChevronRight className="hidden size-3.5 shrink-0 text-muted-foreground/60 sm:inline" />
             <span className="truncate font-medium text-foreground">{crumbLabel}</span>

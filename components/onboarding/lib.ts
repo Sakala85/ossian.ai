@@ -7,13 +7,13 @@ import type { DealershipProfile, LanguageCode } from "@/lib/domain/types";
 
 export type StepId = 1 | 2 | 3 | 4 | 5 | 6;
 
-export const STEPS: { id: StepId; label: string; hint: string; eta: string }[] = [
-  { id: 1, label: "Votre concession", hint: "Site web et informations", eta: "2 min" },
-  { id: 2, label: "Analyse", hint: "Lecture de votre site", eta: "1 min 45" },
-  { id: 3, label: "Vérification", hint: "Sites, horaires, prestations", eta: "1 min 20" },
-  { id: 4, label: "Votre agent", hint: "Voix, ton et accueil", eta: "50 s" },
-  { id: 5, label: "Connexions", hint: "DMS, agenda, alertes", eta: "30 s" },
-  { id: 6, label: "Test & mise en ligne", hint: "Renvoi d'appel", eta: "15 s" },
+export const STEPS: { id: StepId; label: string; hint: string; eta: string; optional?: boolean }[] = [
+  { id: 1, label: "Votre concession", hint: "Adresse du site web", eta: "1 min" },
+  { id: 2, label: "Analyse", hint: "Lecture de votre site", eta: "45 s" },
+  { id: 3, label: "Vérification", hint: "Sites, horaires, prestations", eta: "1 min 20", optional: true },
+  { id: 4, label: "Votre agent", hint: "Voix, ton et accueil", eta: "50 s", optional: true },
+  { id: 5, label: "Connexions", hint: "DMS, agenda, alertes", eta: "30 s", optional: true },
+  { id: 6, label: "Activation", hint: "Un clic, puis le renvoi d'appel", eta: "10 s" },
 ];
 
 export const TOTAL_STEPS = STEPS.length;
@@ -394,38 +394,25 @@ export function providerName(id: BookingProviderId) {
 /* Go live (step 6)                                                    */
 /* ------------------------------------------------------------------ */
 
-export type LineMode = "forward" | "new_number" | "sip";
-export type AreaCode = "04" | "01" | "09";
+/** Result of POST /api/onboarding/activate (or a local demo activation when no database is configured). */
+export interface Activation {
+  email: string;
+  phone: { e164: string; display: string } | null;
+  fallback: string | null;
+  accessUrl: string | null;
+  emailSent: boolean;
+  /** No database on this deployment: the activation stayed local (demo). */
+  demo: boolean;
+}
 
 export interface GoLive {
-  mode: LineMode;
-  area: AreaCode;
-  tested: boolean;
-  forwarded: boolean;
-  teamNotified: boolean;
   live: boolean;
+  email: string;
+  fallback: string;
+  activation: Activation | null;
 }
 
-export const initialGoLive: GoLive = { mode: "forward", area: "04", tested: false, forwarded: false, teamNotified: false, live: false };
-
-export const OSSIAN_NUMBER = { display: "+33 4 28 29 30 31", e164: "+33428293031", digits: "0428293031" };
-
-export const AREA_NUMBERS: Record<AreaCode, { display: string; e164: string; region: string }> = {
-  "04": { display: "+33 4 28 29 30 31", e164: "+33428293031", region: "Sud-Est" },
-  "01": { display: "+33 1 87 21 30 31", e164: "+33187213031", region: "Île-de-France" },
-  "09": { display: "+33 9 70 73 30 31", e164: "+33970733031", region: "Non géographique" },
-};
-
-export const FORWARD_CODES = [
-  { label: "Sur non-réponse", hint: "Après ~15 s de sonnerie", code: `**61*${OSSIAN_NUMBER.digits}#`, recommended: true },
-  { label: "Sur occupation", hint: "Quand la ligne est déjà en communication", code: `**67*${OSSIAN_NUMBER.digits}#` },
-  { label: "Inconditionnel", hint: "Tous les appels, immédiatement", code: `**21*${OSSIAN_NUMBER.digits}#` },
-  { label: "Désactivation", hint: "Annule tous les renvois", code: "##002#" },
-];
-
-export function lineNumber(g: GoLive) {
-  return g.mode === "new_number" ? AREA_NUMBERS[g.area].display : OSSIAN_NUMBER.display;
-}
+export const initialGoLive: GoLive = { live: false, email: "", fallback: "", activation: null };
 
 /* ------------------------------------------------------------------ */
 /* Draft persistence (resume after "Enregistrer et quitter" / demo)   */
@@ -444,6 +431,7 @@ export interface Draft {
   input: StartInput;
   connections: Connections;
   golive: GoLive;
+  visited?: StepId[];
   savedAt: number;
 }
 

@@ -2,15 +2,18 @@
 
 import { CircleCheck, Info, TriangleAlert } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { CommandMenu, type RecentCall } from "./command-menu";
 import { CloseButton } from "./overlay";
-import { ShellContext, type Range, type ShellApi, type ToastTone } from "./shell-context";
+import { DEMO_WORKSPACE, ShellContext, type Range, type ShellApi, type ToastTone, type Workspace } from "./shell-context";
 import { Sidebar, type SiteFilter } from "./sidebar";
 
 const COLLAPSE_KEY = "ossian.sidebar.collapsed";
+/** Pages already backed by the signed-in dealership's real data. */
+const REAL_DATA_PAGES = ["/app", "/app/calls"];
 
 type Toast = { id: number; message: string; tone: ToastTone };
 
@@ -18,10 +21,12 @@ export function Shell({
   children,
   liveCount,
   recentCalls,
+  workspace = DEMO_WORKSPACE,
 }: {
   children: React.ReactNode;
   liveCount: number;
   recentCalls: RecentCall[];
+  workspace?: Workspace;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -81,8 +86,8 @@ export function Shell({
   }, []);
 
   const api = useMemo<ShellApi>(
-    () => ({ openNav: () => setNavOpen(true), openCommand: () => setCmdOpen(true), range, setRange, toast }),
-    [range, toast],
+    () => ({ workspace, openNav: () => setNavOpen(true), openCommand: () => setCmdOpen(true), range, setRange, toast }),
+    [workspace, range, toast],
   );
 
   const sidebarProps = { liveCount, site, onSiteChange: setSite };
@@ -126,7 +131,22 @@ export function Shell({
           )}
         </AnimatePresence>
 
-        <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+        <div className="flex min-w-0 flex-1 flex-col">
+          {workspace.live && !REAL_DATA_PAGES.includes(pathname ?? "") && (
+            <div className="flex items-center gap-2.5 border-b border-border bg-subtle px-4 py-2 text-[13px] text-muted-foreground md:px-6 [&_svg]:size-4 [&_svg]:shrink-0">
+              <Info />
+              <p className="min-w-0">
+                Aperçu avec des données d&apos;exemple : cette page sera reliée à votre compte prochainement. Vos appels, demandes de RDV, leads et
+                rappels réels sont sur la{" "}
+                <Link href="/app" className="font-medium text-foreground underline-offset-4 hover:underline">
+                  vue d&apos;ensemble
+                </Link>
+                .
+              </p>
+            </div>
+          )}
+          {children}
+        </div>
       </div>
 
       <CommandMenu open={cmdOpen} onClose={() => setCmdOpen(false)} recentCalls={recentCalls} />

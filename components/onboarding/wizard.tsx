@@ -15,7 +15,6 @@ import {
   emptyProfile,
   initialConnections,
   initialGoLive,
-  lineNumber,
   loadDraft,
   nameFromUrl,
   normalizeProfile,
@@ -24,6 +23,7 @@ import {
   saveDraft,
   syncGreeting,
   templateProfile,
+  type Activation,
   type Connections,
   type Draft,
   type GoLive,
@@ -33,16 +33,17 @@ import {
   type UpdateProfile,
 } from "./lib";
 import { StepSkeleton } from "./skeleton";
+import { StepActivate } from "./step-activate";
 import { StepAgent } from "./step-agent";
 import { StepAnalyze } from "./step-analyze";
 import { StepConnect } from "./step-connect";
 import { StepDealership } from "./step-dealership";
-import { StepGoLive } from "./step-golive";
 import { StepReview } from "./step-review";
 import { MobileProgress, Stepper } from "./stepper";
 import { TopBar } from "./top-bar";
 import { useAnalyze } from "./use-analyze";
 import { useSpeech } from "./use-speech";
+import { Callout } from "./shared";
 
 const AUTO_ADVANCE_MS = 1300;
 const EMPTY_INPUT: StartInput = { url: "", name: "", sites: null };
@@ -56,8 +57,10 @@ const panel: Variants = {
 };
 
 /**
- * Self-serve onboarding: URL → streamed site analysis → review → persona →
- * connections → test & go live. The whole dealership lives in one
+ * Self-serve onboarding. Fast path: URL → streamed site analysis → one-click
+ * activation (account + number + private dashboard link) → call forwarding,
+ * verified live by the first call. Review, persona and connections (steps 3–5)
+ * are optional detours. The whole dealership lives in one
  * `DealershipProfile` state object; the wizard state is mirrored to
  * localStorage so "Enregistrer et quitter" and the demo round-trip resume.
  */
@@ -79,6 +82,9 @@ export function OnboardingWizard() {
   const [golive, setGolive] = useState<GoLive>(initialGoLive);
   const [resume, setResume] = useState<Draft | null>(null);
   const [autoAdvance, setAutoAdvance] = useState(false);
+  const [visited, setVisited] = useState<StepId[]>([1]);
+  const [account, setAccount] = useState<{ name: string } | null>(null);
+  const invalidLink = searchParams.get("lien") === "invalide";
 
   const analysis = useAnalyze();
   const speech = useSpeech();
@@ -91,6 +97,7 @@ export function OnboardingWizard() {
   const goTo = (n: StepId, opts: { resetMax?: boolean } = {}) => {
     setDir(n >= step ? 1 : -1);
     setStep(n);
+    setVisited((v) => (opts.resetMax ? [1, n] : v.includes(n) ? v : [...v, n]));
     setMaxStep((m) => (opts.resetMax ? n : (Math.max(m, n) as StepId)));
     if (n === step) window.history.replaceState(null, "", stepHref(n));
     else window.history.pushState(null, "", stepHref(n));
@@ -106,6 +113,7 @@ export function OnboardingWizard() {
     setConnections(d.connections);
     setGolive(d.golive);
     setMaxStep(d.maxStep);
+    setVisited(d.visited ?? [1, 2, 3, 4, 5, 6].filter((n) => n <= d.maxStep) as StepId[]);
   };
 
   // Hydrate from the saved draft (resume after "Enregistrer et quitter" or a round-trip to /demo).
@@ -126,6 +134,11 @@ export function OnboardingWizard() {
       if (at > 1) window.history.replaceState(null, "", stepHref(1));
     }
     setHydrated(true);
+    // Already activated on this browser? Offer the dashboard instead of a second account.
+    fetch("/api/onboarding/status", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j: { signedIn?: boolean; name?: string }) => j.signedIn && j.name && setAccount({ name: j.name }))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -189,7 +202,7 @@ export function OnboardingWizard() {
     setReady(true);
     setSource("demo");
     setEdited([]);
-    goTo(3);
+    goTo(6);
   };
 
   const skipToManual = () => {
@@ -240,7 +253,7 @@ export function OnboardingWizard() {
     setMaxStep((m) => Math.max(m, 3) as StepId);
   }, [analysis.state, input.name]);
 
-  // Auto-advance to the review shortly after a fresh analysis completes.
+  // Auto-advance to the activation shortly after a fresh analysis completes.
   useEffect(() => {
     const a = analysis.state;
     if (step !== 2 || a.status !== "done" || !ready || !a.doneAt || Date.now() - a.doneAt > 4000) {
@@ -250,7 +263,7 @@ export function OnboardingWizard() {
     setAutoAdvance(true);
     const t = setTimeout(() => {
       setAutoAdvance(false);
-      goTo(3);
+      goTo(6);
     }, AUTO_ADVANCE_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -271,6 +284,7 @@ export function OnboardingWizard() {
     input,
     connections,
     golive,
+    visited,
     savedAt: Date.now(),
     ...over,
   });
@@ -280,9 +294,9 @@ export function OnboardingWizard() {
     if (!ready && step === 1) return;
     saveDraft(draftOf());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, step, maxStep, profile, ready, source, edited, input, connections, golive]);
+  }, [hydrated, step, maxStep, profile, ready, source, edited, input, connections, golive, visited]);
 
-  // Entering "Test & mise en ligne" saves the profile for /demo and /app.
+  // Entering the activation step saves the profile for /demo.
   useEffect(() => {
     if (hydrated && step === 6 && ready) saveProfile(profile);
   }, [hydrated, step, ready, profile]);
@@ -298,16 +312,9 @@ export function OnboardingWizard() {
     router.push("/app");
   };
 
-  const markTested = () => {
-    const g = { ...golive, tested: true };
-    setGolive(g);
-    if (ready) saveProfile(profile);
-    saveDraft(draftOf({ golive: g }));
-  };
-
-  const goLive = () => {
+  const activated = (activation: Activation) => {
     saveProfile(profile);
-    setGolive((g) => ({ ...g, live: true }));
+    setGolive((g) => ({ ...g, live: true, activation }));
     setMaxStep(6);
     clearDraft();
   };
@@ -327,6 +334,7 @@ export function OnboardingWizard() {
       : golive.live
         ? "listening"
         : "idle";
+  const line = golive.activation?.phone?.display;
   // A profile is required past the analysis; fall back to the first step otherwise.
   const shown: StepId = !ready && step > 2 ? 1 : step;
 
@@ -353,7 +361,8 @@ export function OnboardingWizard() {
             profile={profile}
             source={source}
             autoAdvanceMs={autoAdvance ? AUTO_ADVANCE_MS : null}
-            onContinue={() => goTo(3)}
+            onContinue={() => goTo(6)}
+            onCustomize={() => goTo(3)}
             onRetry={retry}
             onUseDemo={continueWithDemo}
             onEditUrl={editUrl}
@@ -387,14 +396,15 @@ export function OnboardingWizard() {
         );
       case 6:
         return (
-          <StepGoLive
+          <StepActivate
             profile={profile}
+            source={source}
             golive={golive}
             onGoliveChange={setGolive}
-            onTest={markTested}
-            onGoLive={goLive}
+            onActivated={activated}
+            onEdit={(n) => goTo(n)}
             onRestart={restart}
-            onBack={() => goTo(5)}
+            onBack={() => goTo(visited.includes(5) ? 5 : source === "template" ? 1 : 2)}
           />
         );
     }
@@ -418,6 +428,7 @@ export function OnboardingWizard() {
                 step={step}
                 maxStep={maxStep}
                 skippedAnalysis={source === "template"}
+                visited={visited}
                 live={golive.live}
                 onSelect={(n) => goTo(n)}
               />
@@ -427,6 +438,22 @@ export function OnboardingWizard() {
           <main className="min-w-0">
             <div className="mx-auto w-full max-w-[720px]">
               {hydrated ? (
+                <>
+                {shown === 1 && invalidLink && !account && (
+                  <Callout tone="warning" className="mb-6">
+                    Ce lien d&apos;accès n&apos;est plus valide. Retrouvez le bon lien dans l&apos;e-mail de bienvenue, ou activez une nouvelle
+                    concession ci-dessous.
+                  </Callout>
+                )}
+                {shown === 1 && account && (
+                  <Callout tone="primary" className="mb-6">
+                    Ce navigateur est connecté à <span className="font-medium">{account.name}</span>.{" "}
+                    <a href="/app" className="font-medium text-primary underline-offset-4 hover:underline">
+                      Ouvrir le tableau de bord
+                    </a>{" "}
+                    ou configurez une autre concession ci-dessous.
+                  </Callout>
+                )}
                 <AnimatePresence mode="wait" initial={false} custom={dir}>
                   <motion.div
                     key={shown}
@@ -440,6 +467,7 @@ export function OnboardingWizard() {
                     {renderStep()}
                   </motion.div>
                 </AnimatePresence>
+                </>
               ) : (
                 <StepSkeleton />
               )}
@@ -456,7 +484,7 @@ export function OnboardingWizard() {
                 analyzing={analysis.state.status === "running"}
                 orbState={orbState}
                 live={golive.live}
-                line={step === 6 || golive.live ? lineNumber(golive) : undefined}
+                line={line}
               />
             </div>
           </aside>

@@ -28,12 +28,15 @@ export function Stepper({
   step,
   maxStep,
   skippedAnalysis,
+  visited,
   live,
   onSelect,
 }: {
   step: StepId;
   maxStep: StepId;
   skippedAnalysis: boolean;
+  /** Steps opened at least once: optional steps never opened show as "Facultatif". */
+  visited: StepId[];
   live: boolean;
   onSelect: (s: StepId) => void;
 }) {
@@ -44,7 +47,9 @@ export function Stepper({
       <ol className="relative">
         {STEPS.map((s, i) => {
           const skipped = skippedAnalysis && s.id === 2;
-          const visual: Visual = live ? "done" : skipped ? "skipped" : s.id === step ? "current" : s.id < step ? "done" : "todo";
+          const optionalSkipped = Boolean(s.optional) && !visited.includes(s.id) && s.id !== step;
+          const visual: Visual =
+            skipped || optionalSkipped ? "skipped" : live ? "done" : s.id === step ? "current" : s.id < step ? "done" : "todo";
           const reachable = !live && !skipped && s.id !== step && s.id <= maxStep;
           const lineDone = live || s.id < step;
           return (
@@ -74,7 +79,7 @@ export function Stepper({
                   >
                     {s.label}
                   </span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">{skipped ? "Ignorée — sans site web" : s.hint}</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">{skipped ? "Ignorée — sans site web" : optionalSkipped ? "Facultatif · modifiable ensuite" : s.hint}</span>
                 </span>
               </button>
             </li>

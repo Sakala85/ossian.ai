@@ -2,7 +2,7 @@
 -- Multi-tenant: organization (groupe) → dealerships (concessions) → sites.
 -- Every tenant table carries org_id and is protected by RLS.
 
-create extension if not exists "pgcrypto";
+create extension if not exists pgcrypto with schema extensions;
 
 -- ---------------------------------------------------------------------------
 -- Tenancy

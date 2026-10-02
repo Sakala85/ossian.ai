@@ -3,7 +3,7 @@ import type { AgentEvent } from "@/lib/agent/events";
 import { PilotBackend } from "@/lib/agent/pilot-backend";
 import { hasAnthropicKey, runClaudeTurn } from "@/lib/agent/runtime";
 import { runSimulatedTurn } from "@/lib/agent/simulated";
-import { getDealershipByPhone, isAuthorizedProvider, isDemoDealership } from "@/lib/server/dealerships";
+import { isAuthorizedProvider, resolveDealership } from "@/lib/server/dealerships";
 import { prepareTurn, saveTurn } from "@/lib/voice/call-session";
 import { toE164 } from "@/lib/voice/phone";
 import { sseChunker, type VapiLlmRequest } from "@/lib/voice/vapi";
@@ -28,9 +28,11 @@ export async function POST(req: Request) {
   const callId = body.call?.id;
   const calledNumber = body.phoneNumber?.number ?? body.call?.phoneNumber?.number ?? body.metadata?.calledNumber;
   const callerNumber = body.customer?.number ?? body.call?.customer?.number;
-  const profile = await getDealershipByPhone(calledNumber);
-  const backend = isDemoDealership(profile) ? new DemoBackend(profile) : new PilotBackend(profile, { callId, callerNumber });
-  const { history, userText, userTurns } = await prepareTurn(callId, body.messages);
+  const dealership = await resolveDealership(calledNumber);
+  const { profile } = dealership;
+  const isDemo = dealership.source === "demo";
+  const backend = isDemo ? new DemoBackend(profile) : new PilotBackend(profile, { callId, callerNumber, dealershipId: dealership.dealershipId, contactEmail: dealership.contactEmail });
+  const { history, userText, userTurns, outcome, summary } = await prepareTurn(callId, body.messages);
   const sse = sseChunker(body.model);
 
   const stream = new ReadableStream<Uint8Array>({
@@ -38,6 +40,8 @@ export async function POST(req: Request) {
       controller.enqueue(sse.role());
       let transferTo: string | null = null;
       let hangUp = false;
+      let endOutcome = outcome;
+      let endSummary = summary;
       let appended: NonNullable<Extract<AgentEvent, { type: "messages" }>["messages"]> = [];
 
       const emit = (e: AgentEvent) => {
@@ -47,13 +51,15 @@ export async function POST(req: Request) {
             break;
           case "tool_result":
             // Demo dealership numbers are fictional: the transfer stays verbal only.
-            if (e.name === "transfer_call" && e.ok && !isDemoDealership(profile)) {
+            if (e.name === "transfer_call" && e.ok && !isDemo) {
               const r = e.result as { status?: string; number?: string };
               if (r.status === "transfert_en_cours") transferTo = toE164(r.number);
             }
             break;
           case "end_call":
             hangUp = true;
+            endOutcome = e.outcome;
+            endSummary = e.summary;
             break;
           case "messages":
             appended = e.messages;
@@ -76,7 +82,7 @@ export async function POST(req: Request) {
         }
       }
 
-      await saveTurn(callId, { history: [...history, ...appended], userTurns });
+      await saveTurn(callId, { history: [...history, ...appended], userTurns, outcome: endOutcome, summary: endSummary });
 
       if (transferTo) {
         controller.enqueue(sse.toolCall("transferCall", { destination: transferTo }));

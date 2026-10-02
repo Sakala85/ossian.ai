@@ -9,6 +9,7 @@ import { CallsChart } from "@/components/app/overview/calls-chart";
 import { Heatmap } from "@/components/app/overview/heatmap";
 import { KpiRow } from "@/components/app/overview/kpi-row";
 import { ResolutionCard } from "@/components/app/overview/resolution-card";
+import { LiveOverview } from "@/components/app/overview/live-overview";
 import { Page } from "@/components/app/page-header";
 import { ToastButton } from "@/components/app/toast-button";
 import { LinkButton } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import {
   getLeads,
 } from "@/lib/demo/data";
 import { INTENTS, LANGUAGES, OUTCOMES, type CallOutcome } from "@/lib/domain/types";
+import { getAccount } from "@/lib/server/account";
 import { num, pct } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +35,10 @@ export const metadata: Metadata = { title: "Vue d'ensemble" };
 
 const DAY = 86_400_000;
 
-export default function OverviewPage() {
+export default async function OverviewPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const account = await getAccount();
+  if (account) return <LiveOverview account={account} welcome={(await searchParams).bienvenue === "1"} />;
+
   const now = new Date();
   const kpis = getKpis(now);
   const daily = getDailyStats(now, 30);

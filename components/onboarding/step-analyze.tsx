@@ -79,6 +79,7 @@ export function StepAnalyze({
   source,
   autoAdvanceMs,
   onContinue,
+  onCustomize,
   onRetry,
   onUseDemo,
   onEditUrl,
@@ -91,6 +92,7 @@ export function StepAnalyze({
   /** Duration of the pending auto-advance, or null when none is scheduled. */
   autoAdvanceMs: number | null;
   onContinue: () => void;
+  onCustomize: () => void;
   onRetry: () => void;
   onUseDemo: () => void;
   onEditUrl: () => void;
@@ -161,7 +163,7 @@ export function StepAnalyze({
                 <span className="hidden sm:inline"> — généralement moins d&apos;une minute</span>
               </>
             )}
-            {phase === "done" && "Toutes les informations restent modifiables à l'étape suivante."}
+            {phase === "done" && "Votre agent est prêt. Tout reste modifiable, maintenant ou après l'activation."}
             {phase === "error" && "Pas d'inquiétude : vous pouvez réessayer ou continuer avec un profil de démonstration."}
             {phase === "empty" && "Revenez à l'étape précédente pour analyser le site de votre concession."}
           </p>
@@ -186,7 +188,9 @@ export function StepAnalyze({
                 <p className="text-[15px] font-medium text-foreground">
                   Nous avons trouvé : <span className="tabular">{summaryParts(summary).join(" · ")}</span>
                 </p>
-                <p className="mt-1 text-[13px] text-muted-foreground">Vérifiez-les avant de choisir la voix de votre agent.</p>
+                <p className="mt-1 text-[13px] text-muted-foreground">
+                  {profile.agent.name || "Votre agent"} connaît déjà vos horaires, vos prestations et qui joindre pour chaque demande.
+                </p>
                 {mode === "simulated" && (
                   <Badge tone="info" className="mt-3">
                     <Info />
@@ -195,7 +199,10 @@ export function StepAnalyze({
                 )}
               </div>
             </div>
-            <div className="mt-5 flex justify-end">
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <Button variant="ghost" onClick={onCustomize}>
+                Vérifier et personnaliser
+              </Button>
               <Button onClick={onContinue} className="relative w-full overflow-hidden sm:w-auto">
                 {autoAdvanceMs != null && (
                   <motion.span
@@ -207,7 +214,7 @@ export function StepAnalyze({
                   />
                 )}
                 <span className="relative inline-flex items-center gap-2">
-                  Vérifier les informations
+                  Passer à l&apos;activation
                   <ArrowRight className="size-4" />
                 </span>
               </Button>

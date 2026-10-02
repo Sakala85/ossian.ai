@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 const field =
   "w-full rounded-[10px] border border-input bg-card px-3 text-sm text-foreground shadow-[0_1px_2px_0_oklch(0_0_0/4%)] transition-[border,box-shadow] outline-none placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary-soft disabled:opacity-60";
 
-export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...props }: React.ComponentProps<"input">) {
   return <input className={cn(field, "h-9.5", className)} {...props} />;
 }
 
