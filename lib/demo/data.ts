@@ -37,20 +37,22 @@ function startOfDay(d: Date) {
 /* Daily stats (last 30 days)                                          */
 /* ------------------------------------------------------------------ */
 export function getDailyStats(now = new Date(), days = 30): DailyStat[] {
-  const r = rng(42);
   const today = startOfDay(now);
   const out: DailyStat[] = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    // Seeded per calendar day so every window (7/30/60/90 j) shows the same numbers for a given day.
+    const r = rng([...key].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619), 2166136261));
     const dow = d.getDay();
     const base = dow === 0 ? 9 : dow === 6 ? 28 : dow === 1 ? 64 : 52;
-    const ramp = 1 + (days - i) * 0.006; // adoption grows slowly
+    const ramp = 1 + (90 - Math.min(i, 90)) * 0.003; // adoption grows slowly
     const calls = Math.round(base * ramp * (0.86 + r() * 0.28));
     const transferred = Math.round(calls * (0.16 + r() * 0.06));
     const afterHours = Math.round(calls * (dow === 0 ? 0.9 : dow === 6 ? 0.42 : 0.24 + r() * 0.06));
     out.push({
-      date: d.toISOString().slice(0, 10),
+      date: key,
       calls,
       handledByAi: calls - transferred,
       transferred,
