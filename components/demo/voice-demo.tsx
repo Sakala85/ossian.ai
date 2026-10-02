@@ -121,6 +121,16 @@ export function VoiceDemo() {
       setProfile(loadProfile());
       setCustom(true);
     }
+    // A signed-in dealership tests its own saved agent.
+    fetch("/api/account/profile", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j: { profile?: DealershipProfile | null }) => {
+        if (j.profile?.agent) {
+          setProfile(j.profile);
+          setCustom(true);
+        }
+      })
+      .catch(() => {});
     const qLang = params.get("lang") as LanguageCode | null;
     if (qLang && qLang in LANGUAGES) setLang(qLang);
     const ok = Boolean(getRecognitionCtor());

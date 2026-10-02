@@ -6,7 +6,7 @@
  *   Make, Zapier…). The payload carries a readable `text` plus structured fields.
  */
 
-export type NotifyEvent = "rdv_demande" | "lead" | "rappel" | "transfert" | "fin_appel" | "activation" | "ligne_active";
+export type NotifyEvent = "rdv_demande" | "lead" | "rappel" | "transfert" | "fin_appel" | "activation" | "ligne_active" | "demande";
 
 const EMOJI: Record<NotifyEvent, string> = {
   rdv_demande: "📅",
@@ -16,7 +16,10 @@ const EMOJI: Record<NotifyEvent, string> = {
   fin_appel: "📝",
   activation: "🚀",
   ligne_active: "✅",
+  demande: "🙋",
 };
+
+const TEAM_EVENTS = new Set<NotifyEvent>(["activation", "ligne_active", "demande"]);
 
 export async function notifyTeam(
   event: NotifyEvent,
@@ -31,7 +34,11 @@ export async function notifyTeam(
   const text = `${EMOJI[event]} *${title}* — ${dealership}\n${lines.join("\n")}`;
   console.info(`[notify:${event}]`, dealership, title, fields);
 
-  if (opts.email) await sendEmail(opts.email, `${EMOJI[event]} ${title} — ${dealership}`, lines.map((l) => l.replace(/\*/g, "")).join("\n"));
+  const plain = lines.map((l) => l.replace(/\*/g, "")).join("\n");
+  if (opts.email) await sendEmail(opts.email, `${EMOJI[event]} ${title} — ${dealership}`, plain);
+  // Ossian's own team hears about sign-ups and requests by email too.
+  const team = process.env.OSSIAN_TEAM_EMAIL;
+  if (team && TEAM_EVENTS.has(event)) await sendEmail(team, `[Ossian] ${EMOJI[event]} ${title} — ${dealership}`, plain);
 
   const hook = process.env.OSSIAN_NOTIFY_WEBHOOK_URL;
   if (!hook) return;

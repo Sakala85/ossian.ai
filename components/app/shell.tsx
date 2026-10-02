@@ -2,7 +2,6 @@
 
 import { CircleCheck, Info, TriangleAlert } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -12,8 +11,6 @@ import { DEMO_WORKSPACE, ShellContext, type Range, type ShellApi, type ToastTone
 import { Sidebar, type SiteFilter } from "./sidebar";
 
 const COLLAPSE_KEY = "ossian.sidebar.collapsed";
-/** Pages already backed by the signed-in dealership's real data. */
-const REAL_DATA_PAGES = ["/app", "/app/calls"];
 
 type Toast = { id: number; message: string; tone: ToastTone };
 
@@ -132,19 +129,6 @@ export function Shell({
         </AnimatePresence>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {workspace.live && !REAL_DATA_PAGES.includes(pathname ?? "") && (
-            <div className="flex items-center gap-2.5 border-b border-border bg-subtle px-4 py-2 text-[13px] text-muted-foreground md:px-6 [&_svg]:size-4 [&_svg]:shrink-0">
-              <Info />
-              <p className="min-w-0">
-                Aperçu avec des données d&apos;exemple : cette page sera reliée à votre compte prochainement. Vos appels, demandes de RDV, leads et
-                rappels réels sont sur la{" "}
-                <Link href="/app" className="font-medium text-foreground underline-offset-4 hover:underline">
-                  vue d&apos;ensemble
-                </Link>
-                .
-              </p>
-            </div>
-          )}
           {children}
         </div>
       </div>

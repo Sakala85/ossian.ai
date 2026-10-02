@@ -1,7 +1,8 @@
 import { INTENTS, LANGUAGES, OUTCOMES, type CallOutcome, type CallRecord, type Intent, type LanguageCode } from "@/lib/domain/types";
 import { formatFrench } from "@/lib/voice/phone";
 import type { Dashboard, DbCall } from "./db";
-import type { Workspace } from "@/components/app/shell-context";
+import { relTime } from "@/components/app/format";
+import type { NotificationItem, Workspace } from "@/components/app/shell-context";
 
 /** Maps stored calls to the dashboard's CallRecord shape. */
 export function toCallRecords(calls: DbCall[], siteLabel = "Concession"): CallRecord[] {
@@ -20,7 +21,52 @@ export function toCallRecords(calls: DbCall[], siteLabel = "Concession"): CallRe
     summary: c.summary ?? "Appel traité par l'agent.",
     extracted: c.extracted ?? {},
     transcript: (c.transcript ?? []).map((l) => ({ role: l.role, text: l.text, t: l.t ?? 0 })),
+    recordingUrl: c.recording_url ?? undefined,
   }));
+}
+
+/** Latest things that need the team's attention, newest first. */
+export function notificationsFor(account: Dashboard, now = new Date()): NotificationItem[] {
+  const fmt = (p: string) => (p.startsWith("+") ? formatFrench(p) : p);
+  const items: (Omit<NotificationItem, "time"> & { at: string })[] = [
+    ...account.callbacks
+      .filter((c) => !c.done_at)
+      .map((c) => ({
+        id: `cb:${c.id}`,
+        kind: c.priority === "haute" ? ("urgent" as const) : ("callback" as const),
+        title: `Rappel à faire · ${c.name ?? fmt(c.phone)}`,
+        body: c.reason,
+        at: c.created_at,
+        href: "/app",
+      })),
+    ...account.appointments
+      .filter((a) => a.status === "en_attente")
+      .map((a) => ({
+        id: `rdv:${a.id}`,
+        kind: "appointment" as const,
+        title: `Demande de RDV · ${a.customer_name}`,
+        body: [a.service, a.vehicle.label].filter(Boolean).join(" · "),
+        at: a.created_at,
+        href: "/app/appointments",
+      })),
+    ...account.leads
+      .filter((l) => l.stage === "nouveau")
+      .map((l) => ({
+        id: `lead:${l.id}`,
+        kind: "lead" as const,
+        title: `Nouveau lead · ${l.name}`,
+        body: [l.interest, l.vehicle].filter(Boolean).join(" · "),
+        at: l.created_at,
+        href: "/app/leads",
+      })),
+    ...(account.phone?.first_call_at
+      ? [{ id: "line", kind: "line" as const, title: "Ligne active", body: "Premier appel reçu : le renvoi fonctionne.", at: account.phone.first_call_at, href: "/app/calls" }]
+      : []),
+  ];
+  return items
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 8)
+    .map(({ at, ...n }) => ({ ...n, time: relTime(at, now) }));
 }
 
 export function workspaceFor(account: Dashboard): Workspace {
@@ -47,6 +93,7 @@ export function workspaceFor(account: Dashboard): Workspace {
       online,
       summary: online ? `24h/24 · ${langs} langue${langs > 1 ? "s" : ""} · ${sites} site${sites > 1 ? "s" : ""}` : "Prête : il reste le renvoi d'appel",
     },
+    notifications: notificationsFor(account),
   };
 }
 

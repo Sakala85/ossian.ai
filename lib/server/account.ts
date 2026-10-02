@@ -19,10 +19,16 @@ export const accessCookieOptions = {
   maxAge: ACCESS_MAX_AGE,
 };
 
-/** The signed-in dealership's data, or null (public demo dashboard). Cached per request. */
-export const getAccount = cache(async (): Promise<Dashboard | null> => {
+/** The access token of this browser, if any. */
+export async function getAccessToken() {
   if (!dbEnabled) return null;
   const token = (await cookies()).get(ACCESS_COOKIE)?.value;
+  return token && /^[a-f0-9]{48}$/.test(token) ? token : null;
+}
+
+/** The signed-in dealership's data, or null (public demo dashboard). Cached per request. */
+export const getAccount = cache(async (): Promise<Dashboard | null> => {
+  const token = await getAccessToken();
   if (!token) return null;
   try {
     return await db.dashboard(token);

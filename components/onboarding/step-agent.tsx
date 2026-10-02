@@ -78,12 +78,15 @@ export function StepAgent({
   speech,
   onBack,
   onNext,
+  embedded = false,
 }: {
   profile: DealershipProfile;
   update: UpdateProfile;
   speech: Speech;
-  onBack: () => void;
-  onNext: () => void;
+  onBack?: () => void;
+  onNext?: () => void;
+  /** Rendered inside the dashboard: no wizard header or navigation. */
+  embedded?: boolean;
 }) {
   const ids = useId();
   const a = profile.agent;
@@ -110,15 +113,17 @@ export function StepAgent({
 
   return (
     <div>
-      <StepHeader
-        step={4}
-        title={
-          <>
-            Donnez une <span className="font-serif-accent">voix</span> à votre agent.
-          </>
-        }
-        description="Nom, voix, ton et langues : vos clients entendront la concession, pas un robot."
-      />
+      {!embedded && (
+        <StepHeader
+          step={4}
+          title={
+            <>
+              Donnez une <span className="font-serif-accent">voix</span> à votre agent.
+            </>
+          }
+          description="Nom, voix, ton et langues : vos clients entendront la concession, pas un robot."
+        />
+      )}
 
       <div className="grid gap-4">
         <Block title="Voix" description="Écoutez le message d'accueil avec chaque voix.">
@@ -332,7 +337,7 @@ export function StepAgent({
         </Block>
       </div>
 
-      <StepActions onBack={onBack} onNext={onNext} />
+      {!embedded && <StepActions onBack={onBack} onNext={onNext} />}
     </div>
   );
 }

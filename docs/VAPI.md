@@ -38,6 +38,7 @@ Projet `ossian-ai` → *Settings → Environment Variables*, puis redéployez :
 | `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` / `OSSIAN_DB_KEY` | base Supabase « ossian » (comptes, numéros, appels) — ✅ déjà définies |
 | `VAPI_API_KEY` | *(recommandé)* permet à l'activation de renommer le numéro et d'y régler le numéro de secours de la concession |
 | `RESEND_API_KEY` / `OSSIAN_EMAIL_FROM` | *(recommandé)* e-mail de bienvenue (numéro, codes, lien d'accès) et comptes-rendus d'appel envoyés à la concession |
+| `OSSIAN_TEAM_EMAIL` | *(recommandé)* votre adresse : chaque activation, ligne active et demande d'une concession (connexion DMS, campagnes…) vous arrive par e-mail |
 | `NEXT_PUBLIC_SITE_URL` | `https://ossian-ai.vercel.app` (ou votre domaine) |
 | `OSSIAN_NOTIFY_WEBHOOK_URL` | webhook Slack, Teams, Make ou Zapier de l'équipe Ossian (activations, demandes, comptes-rendus) |
 | `ELEVENLABS_VOICE_ID` | *(optionnel)* l'identifiant de la voix ElevenLabs à utiliser |

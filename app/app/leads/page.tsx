@@ -4,14 +4,48 @@ import { LeadsBoard } from "@/components/app/leads/leads-board";
 import { Page } from "@/components/app/page-header";
 import { Delta, StatTile } from "@/components/app/stat-tile";
 import { ToastButton } from "@/components/app/toast-button";
+import { CsvButton } from "@/components/app/csv-button";
+import { fmtDateShort } from "@/components/app/format";
+import { LiveLeads } from "@/components/app/live/live-leads";
 import { getAllCalls, getLeads } from "@/lib/demo/data";
+import { LEAD_STAGES, type LeadStage } from "@/lib/domain/types";
+import { getAccount } from "@/lib/server/account";
 import { pct } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Leads" };
 
-export default function LeadsPage() {
+export default async function LeadsPage() {
   const now = new Date();
+  const account = await getAccount();
+  if (account) {
+    const agent = account.dealership.agent_name ?? "Léa";
+    return (
+      <Page
+        title="Leads"
+        subtitle={`Projets d'achat, de reprise ou de financement qualifiés par ${agent} au téléphone. Suivez-les jusqu'à la vente.`}
+        actions={
+          <CsvButton
+            filename={`leads-${now.toISOString().slice(0, 10)}.csv`}
+            rows={account.leads.map((l) => ({
+              Date: fmtDateShort(l.created_at),
+              Nom: l.name,
+              Téléphone: l.phone,
+              "E-mail": l.email,
+              Intérêt: l.interest,
+              Véhicule: l.vehicle,
+              Budget: l.budget,
+              Reprise: l.trade_in,
+              Étape: LEAD_STAGES[l.stage as LeadStage] ?? l.stage,
+              Note: l.note,
+            }))}
+          />
+        }
+      >
+        <LiveLeads leads={account.leads} now={now.toISOString()} />
+      </Page>
+    );
+  }
   const leads = getLeads(now);
   const calls = getAllCalls(now);
 

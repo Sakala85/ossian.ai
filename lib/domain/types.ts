@@ -164,6 +164,8 @@ export interface CallRecord {
   csat?: number;
   transcript: TranscriptLine[];
   extracted?: Record<string, string>;
+  /** Real recording (live accounts); the demo simulates playback. */
+  recordingUrl?: string;
 }
 
 export type AppointmentStatus = "confirme" | "en_attente" | "honore" | "no_show" | "annule";

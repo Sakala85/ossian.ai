@@ -166,4 +166,12 @@ export const db = {
     rpc<{ id: string; e164: string; status: string }>("ossian_pool_add", { p_e164: e164, p_vapi_id: vapiId, p_provider: provider }),
 
   poolStatus: () => rpc<{ available: number; assigned: number }>("ossian_pool_status", {}),
+
+  updateProfile: (token: string, profile: DealershipProfile, fallback: string | null) =>
+    rpc<{ ok: boolean; updated_at: string }>("ossian_update_profile", { p_token: token, p_profile: profile, p_fallback: fallback }),
+
+  updateItem: (token: string, kind: ItemKind, id: string, value: string) =>
+    rpc<boolean>("ossian_update_item", { p_token: token, p_kind: kind, p_id: id, p_value: value }),
 };
+
+export type ItemKind = "appointment" | "lead" | "callback";

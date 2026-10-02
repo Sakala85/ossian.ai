@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { hasAnthropicKey } from "@/lib/agent/runtime";
 import { analyzeWithClaude } from "@/lib/onboarding/analyze";
-import { normalizeUrl, simulateProfile } from "@/lib/onboarding/simulate";
+import { normalizeUrl, starterProfile } from "@/lib/onboarding/simulate";
 import { ANALYZE_STEPS, type AnalyzeEvent } from "@/lib/onboarding/types";
 
 export const runtime = "nodejs";
@@ -36,20 +36,13 @@ export async function POST(req: Request) {
             console.error("[onboarding/analyze] falling back to simulated profile", err);
           }
         }
-        // Simulated analysis (no API key, or the site could not be read).
-        const profile = simulateProfile(url, nameHint);
-        const details: Record<string, string> = {
-          fetch: `${url.hostname} · pages publiques`,
-          identity: `${profile.brands.join(", ")} · ${profile.sites.length} site(s)`,
-          hours: `${profile.hours.length} plages horaires`,
-          services: `${profile.services.length} prestations`,
-          routing: `${profile.departments.length} services joignables`,
-          agent: `Agent « ${profile.agent.name} » prêt`,
-        };
+        // No analysis possible (no API key, or the site could not be read): a starter
+        // profile with only the name and website, to complete by hand. Nothing invented.
+        const profile = starterProfile(url, nameHint);
         for (const s of ANALYZE_STEPS) {
           emit({ type: "step", id: s.id, status: "running" });
-          await sleep(550 + Math.random() * 450);
-          emit({ type: "step", id: s.id, status: "done", detail: details[s.id] });
+          await sleep(250);
+          emit({ type: "step", id: s.id, status: "done", detail: s.id === "fetch" ? url.hostname : undefined });
         }
         emit({ type: "profile", profile, mode: "simulated" });
       } catch (err) {

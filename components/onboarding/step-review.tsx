@@ -74,6 +74,7 @@ export function StepReview({
   sitesBucket,
   onBack,
   onNext,
+  embedded = false,
 }: {
   profile: DealershipProfile;
   update: UpdateProfile;
@@ -81,8 +82,10 @@ export function StepReview({
   isAi: (path: string) => boolean;
   markEdited: (path: string) => void;
   sitesBucket: SitesBucket | null;
-  onBack: () => void;
-  onNext: () => void;
+  onBack?: () => void;
+  onNext?: () => void;
+  /** Rendered inside the dashboard: no wizard header, banners or navigation. */
+  embedded?: boolean;
 }) {
   const ids = useId();
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
@@ -121,7 +124,7 @@ export function StepReview({
       });
       return;
     }
-    onNext();
+    onNext?.();
   };
 
   const usedKeys = new Set(profile.departments.map((d) => d.key));
@@ -129,6 +132,8 @@ export function StepReview({
 
   return (
     <div>
+      {!embedded && (
+        <>
       <StepHeader
         step={3}
         title={
@@ -140,34 +145,22 @@ export function StepReview({
       />
 
       <div className="mb-5 grid gap-3">
-        {(source === "ai" || source === "simulated") && (
+        {source === "ai" && (
           <Callout tone="primary" icon={<Sparkles />}>
-            {source === "ai" ? (
-              <>
-                Pré-rempli par l&apos;IA à partir de <span className="font-mono">{host}</span>. Les champs marqués <AiBadge className="mx-0.5 align-[-3px]" />{" "}
-                sont à vérifier.
-              </>
-            ) : (
-              <>
-                <span className="font-medium">Mode démo</span> : profil généré sans clé API à partir de <span className="font-mono">{host}</span>. Complétez
-                les coordonnées réelles (marquées <AiBadge className="mx-0.5 align-[-3px]" />).
-              </>
-            )}
+            Pré-rempli par l&apos;IA à partir de <span className="font-mono">{host}</span>. Les champs marqués <AiBadge className="mx-0.5 align-[-3px]" />{" "}
+            sont à vérifier.
           </Callout>
         )}
-        {source === "demo" && (
-          <Callout tone="warning" icon={<Info />}>
-            <span className="font-medium">Profil de démonstration</span> : ces informations sont fictives. Adaptez-les à votre concession avant la mise en
-            ligne.
-          </Callout>
-        )}
-        {source === "template" && (
+        {(source === "simulated" || source === "template" || source === "demo") && (
           <Callout tone="neutral" icon={<Info />}>
-            Nous avons pré-rempli des valeurs types d&apos;une concession (horaires, prestations, services). Indiquez votre nom et vos coordonnées, puis
-            ajustez le reste.
+            Seuls le nom{host ? " et le site" : ""} sont pré-remplis : rien n&apos;est inventé. Ajoutez vos horaires, vos prestations et les numéros de vos
+            services (les champs vides sont signalés).
           </Callout>
         )}
       </div>
+
+        </>
+      )}
 
       <div className="mb-3 flex items-center justify-between">
         <p className="text-xs text-muted-foreground">6 rubriques</p>
@@ -637,7 +630,7 @@ export function StepReview({
         </Section>
       </div>
 
-      <StepActions onBack={onBack} onNext={next} nextLabel="Configurer l'agent" />
+      {!embedded && <StepActions onBack={onBack} onNext={next} nextLabel="Configurer l'agent" />}
     </div>
   );
 }

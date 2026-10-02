@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/misc";
 import { DEPARTMENTS, type CallRecord } from "@/lib/domain/types";
 import { cn, duration } from "@/lib/utils";
@@ -40,7 +40,8 @@ export function CallDetail({
   onPrev?: () => void;
   onNext?: () => void;
 }) {
-  const { toast } = useShell();
+  const { toast, workspace } = useShell();
+  const live = workspace.live;
   const playback = usePlayback(call.durationSec);
   const name = call.caller.name ?? "Numéro non identifié";
   const extracted = call.extracted ?? derived(call);
@@ -106,10 +107,14 @@ export function CallDetail({
                 <PhoneForwarded /> {DEPARTMENTS[call.transferredTo]}
               </Badge>
             )}
-            <span className="mx-1 h-4 w-px bg-border" />
-            <LangFlag code={call.language} withLabel />
-            <span className="mx-1 h-4 w-px bg-border" />
-            <SentimentDot sentiment={call.sentiment} withLabel />
+            {!live && (
+              <>
+                <span className="mx-1 h-4 w-px bg-border" />
+                <LangFlag code={call.language} withLabel />
+                <span className="mx-1 h-4 w-px bg-border" />
+                <SentimentDot sentiment={call.sentiment} withLabel />
+              </>
+            )}
             {call.csat && (
               <>
                 <span className="mx-1 h-4 w-px bg-border" />
@@ -123,13 +128,23 @@ export function CallDetail({
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => toast(`Appel en cours vers ${call.caller.phone}…`, "info")}>
-              <Phone /> Rappeler
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => toast("Rendez-vous pré-rempli · à confirmer dans le planning")}>
-              <CalendarPlus /> Créer un RDV
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => toast("Transcription exportée (PDF)")}>
+            {live ? (
+              call.caller.phone.match(/\d/) && (
+                <a href={`tel:${call.caller.phone.replace(/\s/g, "")}`} className={buttonVariants({ size: "sm" })}>
+                  <Phone /> Rappeler
+                </a>
+              )
+            ) : (
+              <>
+                <Button size="sm" onClick={() => toast(`Appel en cours vers ${call.caller.phone}…`, "info")}>
+                  <Phone /> Rappeler
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => toast("Rendez-vous pré-rempli · à confirmer dans le planning")}>
+                  <CalendarPlus /> Créer un RDV
+                </Button>
+              </>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => downloadTranscript(call, workspace.agent.name)}>
               <Download /> Exporter
             </Button>
           </div>
@@ -139,7 +154,7 @@ export function CallDetail({
           {/* AI summary */}
           <section className="rounded-xl border border-[color-mix(in_oklch,var(--primary)_20%,var(--border))] bg-primary-soft p-4">
             <div className="mb-1.5 flex items-center gap-2 text-xs font-medium text-primary [&_svg]:size-3.5">
-              <Sparkles /> Résumé par Léa
+              <Sparkles /> Résumé par {workspace.agent.name}
             </div>
             <p className="text-[13.5px] leading-relaxed text-foreground">{call.summary}</p>
             {(call.appointmentId || call.leadId) && (
@@ -174,22 +189,56 @@ export function CallDetail({
           )}
 
           {/* Recording */}
-          <section>
-            <SectionTitle hint={relTime(call.startedAt, now)}>Enregistrement</SectionTitle>
-            <AudioPlayer id={call.id} playback={playback} onDownload={() => toast("Téléchargement de l'enregistrement (MP3)")} />
-          </section>
+          {live ? (
+            call.recordingUrl && (
+              <section>
+                <SectionTitle hint={relTime(call.startedAt, now)}>Enregistrement</SectionTitle>
+                <audio controls preload="none" src={call.recordingUrl} className="w-full" />
+              </section>
+            )
+          ) : (
+            <section>
+              <SectionTitle hint={relTime(call.startedAt, now)}>Enregistrement</SectionTitle>
+              <AudioPlayer id={call.id} playback={playback} onDownload={() => toast("Téléchargement de l'enregistrement (MP3)")} />
+            </section>
+          )}
 
           {/* Transcript */}
           <section>
             <SectionTitle hint={`${call.transcript.filter((l) => l.role !== "tool").length} messages · ${call.transcript.filter((l) => l.role === "tool").length} actions`}>
               Transcription
             </SectionTitle>
-            <Transcript lines={call.transcript} activeT={playback.t} onSeek={(t) => playback.seek(t)} partial={partial} callerName={call.caller.name} />
+            <Transcript
+              lines={call.transcript}
+              activeT={live ? -1 : playback.t}
+              onSeek={(t) => playback.seek(t)}
+              partial={partial}
+              callerName={call.caller.name}
+            />
           </section>
         </div>
       </div>
     </div>
   );
+}
+
+/** Plain-text transcript download (summary, extracted data, dialogue). */
+function downloadTranscript(call: CallRecord, agent: string) {
+  const who = (r: string) => (r === "agent" ? agent : r === "caller" ? (call.caller.name ?? "Client") : "Action");
+  const lines = [
+    `Appel ${call.direction === "outbound" ? "sortant" : "entrant"} · ${fmtDayLong(call.startedAt)} ${fmtTime(call.startedAt)} · ${call.caller.phone}`,
+    "",
+    `Résumé : ${call.summary}`,
+    ...Object.entries(call.extracted ?? {}).map(([k, v]) => `${k} : ${v}`),
+    "",
+    ...call.transcript.map((l) => `[${Math.floor(l.t / 60)}:${String(Math.floor(l.t % 60)).padStart(2, "0")}] ${who(l.role)} : ${l.text}`),
+  ];
+  const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `appel-${call.startedAt.slice(0, 10)}-${call.id.slice(0, 8)}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function derived(call: CallRecord): Record<string, string> {

@@ -11,7 +11,6 @@ import {
   EASE,
   buildGreeting,
   clearDraft,
-  demoProfileFor,
   emptyProfile,
   initialConnections,
   initialGoLive,
@@ -36,9 +35,9 @@ import { StepSkeleton } from "./skeleton";
 import { StepActivate } from "./step-activate";
 import { StepAgent } from "./step-agent";
 import { StepAnalyze } from "./step-analyze";
-import { StepConnect } from "./step-connect";
 import { StepDealership } from "./step-dealership";
 import { StepReview } from "./step-review";
+import { StepTools, declaredTools } from "./step-tools";
 import { MobileProgress, Stepper } from "./stepper";
 import { TopBar } from "./top-bar";
 import { useAnalyze } from "./use-analyze";
@@ -167,7 +166,7 @@ export function OnboardingWizard() {
   }, []);
 
   const markEdited = useCallback((path: string) => setEdited((e) => (e.includes(path) ? e : [...e, path])), []);
-  const aiFilled = source === "ai" || source === "simulated";
+  const aiFilled = source === "ai";
   const isAi = useCallback((path: string) => aiFilled && !edited.includes(path), [aiFilled, edited]);
 
   const resetSession = () => {
@@ -197,12 +196,14 @@ export function OnboardingWizard() {
     goTo(1);
   };
 
-  const continueWithDemo = () => {
-    setProfile(demoProfileFor(normalizeUrl(input.url) ?? input.url, input.name));
+  // The analysis failed: start from the name and website only, to fill in by hand.
+  const fillManually = () => {
+    analysis.cancel();
+    resetSession();
+    setProfile(templateProfile(input.name.trim() || nameFromUrl(normalizeUrl(input.url) ?? ""), normalizeUrl(input.url) ?? undefined));
     setReady(true);
-    setSource("demo");
-    setEdited([]);
-    goTo(6);
+    setSource("simulated");
+    goTo(3, { resetMax: true });
   };
 
   const skipToManual = () => {
@@ -256,7 +257,8 @@ export function OnboardingWizard() {
   // Auto-advance to the activation shortly after a fresh analysis completes.
   useEffect(() => {
     const a = analysis.state;
-    if (step !== 2 || a.status !== "done" || !ready || !a.doneAt || Date.now() - a.doneAt > 4000) {
+    // Only a real analysis jumps to the activation; a starter profile goes to the form instead.
+    if (step !== 2 || a.status !== "done" || a.mode !== "ai" || !ready || !a.doneAt || Date.now() - a.doneAt > 4000) {
       setAutoAdvance(false);
       return;
     }
@@ -364,7 +366,7 @@ export function OnboardingWizard() {
             onContinue={() => goTo(6)}
             onCustomize={() => goTo(3)}
             onRetry={retry}
-            onUseDemo={continueWithDemo}
+            onManual={fillManually}
             onEditUrl={editUrl}
           />
         );
@@ -385,14 +387,7 @@ export function OnboardingWizard() {
         return <StepAgent profile={profile} update={updateProfile} speech={speech} onBack={() => goTo(3)} onNext={() => goTo(5)} />;
       case 5:
         return (
-          <StepConnect
-            profile={profile}
-            update={updateProfile}
-            connections={connections}
-            onConnectionsChange={setConnections}
-            onBack={() => goTo(4)}
-            onNext={() => goTo(6)}
-          />
+          <StepTools connections={connections} onConnectionsChange={setConnections} onBack={() => goTo(4)} onNext={() => goTo(6)} />
         );
       case 6:
         return (
@@ -402,6 +397,7 @@ export function OnboardingWizard() {
             golive={golive}
             onGoliveChange={setGolive}
             onActivated={activated}
+            tools={declaredTools(connections)}
             onEdit={(n) => goTo(n)}
             onRestart={restart}
             onBack={() => goTo(visited.includes(5) ? 5 : source === "template" ? 1 : 2)}

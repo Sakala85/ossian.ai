@@ -8,6 +8,7 @@ import { INTENTS, type Intent } from "@/lib/domain/types";
 import { cn } from "@/lib/utils";
 import { NAV_ALL } from "./nav";
 import { Modal } from "./overlay";
+import { useShell } from "./shell-context";
 
 export type RecentCall = { id: string; label: string; intent: Intent; time: string };
 
@@ -21,6 +22,7 @@ const normalize = (s: string) =>
 
 export function CommandMenu({ open, onClose, recentCalls }: { open: boolean; onClose: () => void; recentCalls: RecentCall[] }) {
   const router = useRouter();
+  const { workspace } = useShell();
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -33,8 +35,12 @@ export function CommandMenu({ open, onClose, recentCalls }: { open: boolean; onC
         return { id: n.href, group: "Navigation", label: n.label, icon: <Icon />, href: n.href, keywords: n.keywords };
       }),
       { id: "a-test", group: "Actions", label: "Tester l'agent", hint: "Démo vocale", icon: <Play />, href: "/demo", keywords: "appeler léa démo" },
-      { id: "a-cmp", group: "Actions", label: "Nouvelle campagne", icon: <Megaphone />, href: "/app/campaigns?new=1", keywords: "sortant relance" },
-      { id: "a-inv", group: "Actions", label: "Inviter un membre", icon: <UserPlus />, href: "/app/settings#equipe", keywords: "équipe utilisateur" },
+      ...(workspace.live
+        ? []
+        : [
+            { id: "a-cmp", group: "Actions", label: "Nouvelle campagne", icon: <Megaphone />, href: "/app/campaigns?new=1", keywords: "sortant relance" },
+            { id: "a-inv", group: "Actions", label: "Inviter un membre", icon: <UserPlus />, href: "/app/settings#equipe", keywords: "équipe utilisateur" },
+          ]),
       ...recentCalls.map((c) => ({
         id: c.id,
         group: "Appels récents",
@@ -45,7 +51,7 @@ export function CommandMenu({ open, onClose, recentCalls }: { open: boolean; onC
         keywords: INTENTS[c.intent],
       })),
     ],
-    [recentCalls],
+    [recentCalls, workspace.live],
   );
 
   const results = useMemo(() => {

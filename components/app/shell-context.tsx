@@ -16,7 +16,12 @@ export type Workspace = {
   /** Line under the name in the switcher (real accounts). */
   subtitle?: string;
   agent: { name: string; online: boolean; summary: string };
+  /** Real accounts only: notifications from real events. */
+  notifications?: NotificationItem[];
 };
+
+/** A notification built from the dealership's real events (callbacks, requests, leads…). */
+export type NotificationItem = { id: string; kind: "callback" | "urgent" | "appointment" | "lead" | "line"; title: string; body: string; time: string; href: string };
 
 export const DEMO_WORKSPACE: Workspace = {
   name: "Groupe Mistral",

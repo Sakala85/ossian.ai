@@ -143,14 +143,16 @@ export function CallsView({ calls, now, initialId }: { calls: CallRecord[]; now:
             ))}
           </Select>
         )}
-        <Select aria-label="Langue" value={f.lang} onChange={(e) => set("lang", e.target.value as LanguageCode | "")} className={filterCls}>
-          <option value="">Toutes les langues</option>
-          {languages.map((l) => (
-            <option key={l} value={l}>
-              {LANGUAGES[l].flag} {LANGUAGES[l].label}
-            </option>
-          ))}
-        </Select>
+        {languages.length > 1 && (
+          <Select aria-label="Langue" value={f.lang} onChange={(e) => set("lang", e.target.value as LanguageCode | "")} className={filterCls}>
+            <option value="">Toutes les langues</option>
+            {languages.map((l) => (
+              <option key={l} value={l}>
+                {LANGUAGES[l].flag} {LANGUAGES[l].label}
+              </option>
+            ))}
+          </Select>
+        )}
         <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-2.5 text-[13px] text-foreground shadow-[0_1px_2px_0_oklch(0_0_0/4%)]">
           <Moon className="size-3.5 text-muted-foreground" />
           Hors horaires
@@ -171,12 +173,18 @@ export function CallsView({ calls, now, initialId }: { calls: CallRecord[]; now:
         {filtered.length === 0 ? (
           <EmptyState
             icon={<SearchX />}
-            title="Aucun appel ne correspond"
-            description="Essayez d'élargir la recherche ou de retirer un filtre."
+            title={calls.length ? "Aucun appel ne correspond" : "Aucun appel pour l'instant"}
+            description={
+              calls.length
+                ? "Essayez d'élargir la recherche ou de retirer un filtre."
+                : "Chaque appel décroché apparaîtra ici avec son résumé, les informations notées et la transcription."
+            }
             action={
-              <Button variant="outline" size="sm" onClick={() => setF(EMPTY)}>
-                Réinitialiser les filtres
-              </Button>
+              calls.length ? (
+                <Button variant="outline" size="sm" onClick={() => setF(EMPTY)}>
+                  Réinitialiser les filtres
+                </Button>
+              ) : undefined
             }
           />
         ) : (

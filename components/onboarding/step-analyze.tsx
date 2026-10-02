@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/misc";
 import { Orb } from "@/components/voice/orb";
@@ -81,7 +80,7 @@ export function StepAnalyze({
   onContinue,
   onCustomize,
   onRetry,
-  onUseDemo,
+  onManual,
   onEditUrl,
 }: {
   analysis: AnalysisState;
@@ -94,7 +93,7 @@ export function StepAnalyze({
   onContinue: () => void;
   onCustomize: () => void;
   onRetry: () => void;
-  onUseDemo: () => void;
+  onManual: () => void;
   onEditUrl: () => void;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -125,11 +124,17 @@ export function StepAnalyze({
   // The streamed profile is applied by the wizard one render later: summarise it directly to avoid a "0 site" flash.
   const summary = ready || !analysis.profile ? profile : normalizeProfile(analysis.profile);
   const mode = analysis.mode ?? (source === "simulated" ? "simulated" : source === "ai" ? "ai" : undefined);
+  // The site could not be read: only the name and website are known, the rest is filled in by hand.
+  const manual = mode === "simulated";
 
   const title =
     phase === "running" ? (
       <>
         Nous lisons <span className="font-serif-accent">votre site</span>…
+      </>
+    ) : phase === "done" && manual ? (
+      <>
+        Complétez vos <span className="font-serif-accent">informations</span>.
       </>
     ) : phase === "done" ? (
       <>
@@ -163,8 +168,11 @@ export function StepAnalyze({
                 <span className="hidden sm:inline"> — généralement moins d&apos;une minute</span>
               </>
             )}
-            {phase === "done" && "Votre agent est prêt. Tout reste modifiable, maintenant ou après l'activation."}
-            {phase === "error" && "Pas d'inquiétude : vous pouvez réessayer ou continuer avec un profil de démonstration."}
+            {phase === "done" &&
+              (manual
+                ? "Nous n'avons pas pu lire votre site automatiquement : indiquez vos horaires et vos numéros, cela prend 2 minutes."
+                : "Votre agent est prêt. Tout reste modifiable, maintenant ou après l'activation.")}
+            {phase === "error" && "Pas d'inquiétude : vous pouvez réessayer ou saisir vos informations vous-même."}
             {phase === "empty" && "Revenez à l'étape précédente pour analyser le site de votre concession."}
           </p>
         </div>
@@ -180,45 +188,64 @@ export function StepAnalyze({
             transition={{ duration: 0.35, ease: EASE }}
             className="mb-6 rounded-xl border border-border bg-card p-5 shadow-soft"
           >
-            <div className="flex items-start gap-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-success-soft text-success">
-                <Check className="size-4.5" strokeWidth={2.5} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-medium text-foreground">
-                  Nous avons trouvé : <span className="tabular">{summaryParts(summary).join(" · ")}</span>
-                </p>
-                <p className="mt-1 text-[13px] text-muted-foreground">
-                  {profile.agent.name || "Votre agent"} connaît déjà vos horaires, vos prestations et qui joindre pour chaque demande.
-                </p>
-                {mode === "simulated" && (
-                  <Badge tone="info" className="mt-3">
-                    <Info />
-                    Mode démo : profil généré sans clé API
-                  </Badge>
-                )}
-              </div>
-            </div>
-            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
-              <Button variant="ghost" onClick={onCustomize}>
-                Vérifier et personnaliser
-              </Button>
-              <Button onClick={onContinue} className="relative w-full overflow-hidden sm:w-auto">
-                {autoAdvanceMs != null && (
-                  <motion.span
-                    aria-hidden
-                    initial={{ scaleX: 0 }}
-                    animate={{ scaleX: 1 }}
-                    transition={{ duration: autoAdvanceMs / 1000, ease: "linear" }}
-                    className="absolute inset-0 origin-left bg-primary-foreground/15"
-                  />
-                )}
-                <span className="relative inline-flex items-center gap-2">
-                  Passer à l&apos;activation
-                  <ArrowRight className="size-4" />
-                </span>
-              </Button>
-            </div>
+            {manual ? (
+              <>
+                <div className="flex items-start gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-warning-soft text-[color-mix(in_oklch,var(--warning)_75%,var(--foreground))]">
+                    <Info className="size-4.5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-medium text-foreground">Lecture automatique indisponible pour {host || "ce site"}.</p>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                      Rien n&apos;est inventé : seuls le nom et le site sont pré-remplis. Ajoutez vos horaires, vos prestations et les numéros
+                      de vos services pour que {profile.agent.name || "votre agent"} réponde juste.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-5 flex justify-end">
+                  <Button onClick={onCustomize} className="w-full sm:w-auto">
+                    Compléter mes informations
+                    <ArrowRight className="size-4" />
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-start gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-success-soft text-success">
+                    <Check className="size-4.5" strokeWidth={2.5} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-medium text-foreground">
+                      Nous avons trouvé : <span className="tabular">{summaryParts(summary).join(" · ")}</span>
+                    </p>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                      {profile.agent.name || "Votre agent"} connaît déjà vos horaires, vos prestations et qui joindre pour chaque demande.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+                  <Button variant="ghost" onClick={onCustomize}>
+                    Vérifier et personnaliser
+                  </Button>
+                  <Button onClick={onContinue} className="relative w-full overflow-hidden sm:w-auto">
+                    {autoAdvanceMs != null && (
+                      <motion.span
+                        aria-hidden
+                        initial={{ scaleX: 0 }}
+                        animate={{ scaleX: 1 }}
+                        transition={{ duration: autoAdvanceMs / 1000, ease: "linear" }}
+                        className="absolute inset-0 origin-left bg-primary-foreground/15"
+                      />
+                    )}
+                    <span className="relative inline-flex items-center gap-2">
+                      Passer à l&apos;activation
+                      <ArrowRight className="size-4" />
+                    </span>
+                  </Button>
+                </div>
+              </>
+            )}
           </motion.div>
         )}
 
@@ -249,8 +276,8 @@ export function StepAnalyze({
                 <RotateCcw />
                 Réessayer
               </Button>
-              <Button onClick={onUseDemo}>
-                Continuer avec le profil de démonstration
+              <Button onClick={onManual}>
+                Saisir mes informations
                 <ArrowRight />
               </Button>
             </div>

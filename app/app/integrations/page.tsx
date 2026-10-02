@@ -4,12 +4,16 @@ import { IntegrationsView } from "@/components/app/integrations/integrations-vie
 import { WebhooksPanel } from "@/components/app/integrations/webhooks-panel";
 import { Page } from "@/components/app/page-header";
 import { LinkButton } from "@/components/ui/button";
+import { LiveIntegrations } from "@/components/app/live/live-pages";
 import { INTEGRATIONS, getAllCalls } from "@/lib/demo/data";
+import { getAccount } from "@/lib/server/account";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Intégrations" };
 
-export default function IntegrationsPage() {
+export default async function IntegrationsPage() {
+  const account = await getAccount();
+  if (account) return <LiveIntegrations account={account} />;
   const now = new Date();
   const calls = getAllCalls(now);
   const call = calls.find((c) => c.id === "call_7Q2K") ?? calls[0]!;

@@ -1,10 +1,21 @@
 "use client";
 
-import { Bell, CalendarX, Flame, Megaphone, TriangleAlert } from "lucide-react";
+import { Bell, CalendarClock, CalendarX, CircleCheck, Flame, Megaphone, PhoneCall, Sparkles, TriangleAlert, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Popover } from "./popover";
+import { useShell, type NotificationItem } from "./shell-context";
+
+const SEEN_KEY = "ossian.notifications.seen";
+
+const LIVE_STYLE: Record<NotificationItem["kind"], { icon: LucideIcon; tone: string }> = {
+  urgent: { icon: TriangleAlert, tone: "text-danger bg-danger-soft" },
+  callback: { icon: PhoneCall, tone: "text-[color-mix(in_oklch,var(--warning)_75%,var(--foreground))] bg-warning-soft" },
+  appointment: { icon: CalendarClock, tone: "text-primary bg-primary-soft" },
+  lead: { icon: Sparkles, tone: "text-primary bg-primary-soft" },
+  line: { icon: CircleCheck, tone: "text-success bg-success-soft" },
+};
 
 const ITEMS = [
   {
@@ -46,7 +57,31 @@ const ITEMS = [
 ];
 
 export function Notifications() {
-  const [unread, setUnread] = useState(new Set(["n1", "n2", "n3"]));
+  const { workspace } = useShell();
+  const live = workspace.live;
+  const items = useMemo(
+    () => (live ? (workspace.notifications ?? []).map((n) => ({ ...n, ...LIVE_STYLE[n.kind] })) : ITEMS),
+    [live, workspace.notifications],
+  );
+  const [unread, setUnread] = useState(() => new Set(live ? [] : ["n1", "n2", "n3"]));
+
+  // Real accounts: everything not seen on this device yet is unread.
+  useEffect(() => {
+    if (!live) return;
+    let seen: string[] = [];
+    try {
+      seen = JSON.parse(localStorage.getItem(SEEN_KEY) ?? "[]") as string[];
+    } catch {}
+    setUnread(new Set(items.map((n) => n.id).filter((id) => !seen.includes(id))));
+  }, [live, items]);
+
+  useEffect(() => {
+    if (!live) return;
+    try {
+      const seen = items.map((n) => n.id).filter((id) => !unread.has(id));
+      localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+    } catch {}
+  }, [live, items, unread]);
   return (
     <Popover
       align="end"
@@ -80,8 +115,9 @@ export function Notifications() {
               Tout marquer comme lu
             </button>
           </div>
+          {items.length === 0 && <p className="px-4 py-6 text-center text-[13px] text-muted-foreground">Rien à traiter pour l&apos;instant.</p>}
           <ul className="p-1.5">
-            {ITEMS.map((n) => {
+            {items.map((n) => {
               const Icon = n.icon;
               const isUnread = unread.has(n.id);
               return (

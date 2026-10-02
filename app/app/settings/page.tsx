@@ -6,14 +6,18 @@ import { OrganisationPanel } from "@/components/app/settings/organisation-panel"
 import { SecurityPanel } from "@/components/app/settings/security-panel";
 import { SettingsNav } from "@/components/app/settings/settings-nav";
 import { TeamPanel } from "@/components/app/settings/team-panel";
+import { LiveSettings } from "@/components/app/live/live-pages";
 import { DEMO_PROFILE } from "@/lib/demo/profile";
+import { getAccount } from "@/lib/server/account";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Paramètres" };
 
 const monthF = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric", timeZone: "Europe/Paris" });
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const account = await getAccount();
+  if (account) return <LiveSettings account={account} />;
   const now = new Date();
   // First day of next month, at noon UTC to stay on the right calendar day in Paris.
   const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 12));

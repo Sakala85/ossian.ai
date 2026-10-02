@@ -1,4 +1,3 @@
-import { DEMO_PROFILE } from "@/lib/demo/profile";
 import type { DealershipProfile } from "@/lib/domain/types";
 
 const BRANDS = ["Peugeot", "Citroën", "Renault", "Dacia", "Toyota", "Volkswagen", "Audi", "BMW", "Mercedes", "Ford", "Opel", "Fiat", "Kia", "Hyundai", "Nissan", "Skoda", "Seat", "Cupra", "Tesla", "Volvo", "Mazda", "Suzuki", "Jeep", "DS", "Mini", "Lexus", "MG", "BYD"];
@@ -15,42 +14,60 @@ export function normalizeUrl(input: string) {
   }
 }
 
+const PARTICLES = new Set(["de", "du", "des", "la", "le", "les", "et", "d", "l", "en", "sur"]);
+
 function titleCase(s: string) {
   return s
     .split(/[-_.\s]+/)
     .filter(Boolean)
-    .map((w) => (w.length <= 2 ? w.toUpperCase() : w[0]!.toUpperCase() + w.slice(1)))
+    .map((w, i) =>
+      i > 0 && PARTICLES.has(w.toLowerCase()) ? w.toLowerCase() : w.length <= 2 ? w.toUpperCase() : w[0]!.toUpperCase() + w.slice(1),
+    )
     .join(" ");
 }
 
 /**
- * Offline fallback when no API key is configured (or the site can't be read):
- * builds a plausible starter profile from the domain name so the rest of the
- * onboarding (and the demo) still works end-to-end.
+ * Fallback when the site could not be analysed (no API key, site unreachable):
+ * only what we know for sure — the name and the website. Hours, phones,
+ * services and FAQ stay empty for the dealership to fill in: nothing is
+ * invented for a real account.
  */
-export function simulateProfile(url: URL, nameHint?: string): DealershipProfile {
+export function starterProfile(url: URL, nameHint?: string): DealershipProfile {
   const host = url.hostname.replace(/^www\./, "");
   const base = host.split(".")[0] ?? host;
   const name = nameHint?.trim() || titleCase(base);
-  const found = BRANDS.filter((b) => base.toLowerCase().includes(b.toLowerCase().replace("ë", "e")));
-  const brands = found.length ? found : ["Toutes marques"];
-  const p = structuredClone(DEMO_PROFILE);
+  const brands = BRANDS.filter((b) => base.toLowerCase().includes(b.toLowerCase().replace("ë", "e")));
   return {
-    ...p,
     id: `p_${base}`,
     name,
-    group: undefined,
     website: url.origin,
-    description: `${name} — concession et atelier automobile${found.length ? ` ${found.join(", ")}` : " toutes marques"} : ventes de véhicules neufs et d'occasion, entretien, réparation et carrosserie.`,
+    description: "",
     brands,
-    sites: [
-      { id: "site-1", name, address: "Adresse à confirmer", city: "", phone: "À compléter", brands },
-    ],
-    departments: p.departments.map((d) => ({ ...d, phone: "À compléter", email: `${d.key.replace("_", "-")}@${host}` })),
-    faq: p.faq.slice(0, 3),
+    sites: [{ id: "site-1", name, address: "", city: "", phone: "", brands }],
+    hours: [],
+    services: [],
+    departments: STARTER_DEPARTMENTS.map((d) => ({ ...d })),
+    policies: [STARTER_POLICY],
+    faq: [],
     agent: {
-      ...p.agent,
-      greeting: `${name} bonjour, je suis ${p.agent.name}, l'assistante de la concession. Comment puis-je vous aider ?`,
+      name: "Léa",
+      voiceId: "lea-fr",
+      languages: ["fr", "en", "es", "it", "de", "pt", "ar"],
+      tone: "chaleureux",
+      greeting: `${name} bonjour, je suis Léa, l'assistante de la concession. Comment puis-je vous aider ?`,
+      transferPolicy: "business_hours",
+      smsConfirmation: false,
+      recordCalls: true,
     },
   };
 }
+
+/** Service skeleton to fill in (labels only, no invented numbers). */
+export const STARTER_DEPARTMENTS: DealershipProfile["departments"] = [
+  { key: "apres_vente", label: "Atelier / après-vente", phone: "", hours: "" },
+  { key: "vn", label: "Ventes", phone: "", hours: "" },
+  { key: "accueil", label: "Accueil", phone: "", hours: "" },
+];
+
+/** Safe default rule, true for every dealership. */
+export const STARTER_POLICY = "Les prix annoncés au téléphone sont indicatifs ; le devis définitif est établi par un conseiller.";

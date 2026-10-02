@@ -45,12 +45,34 @@ function RecapRow({ icon, label, value, onEdit }: { icon: React.ReactNode; label
   );
 }
 
+/** Information the agent needs to answer well, still missing from the profile. */
+export function missingInfo(p: DealershipProfile) {
+  const missing: string[] = [];
+  if (!p.hours.length) missing.push("vos horaires");
+  if (!p.services.length) missing.push("vos prestations");
+  if (!p.sites.some((s) => s.phone.trim()) && !p.departments.some((d) => d.phone.trim())) missing.push("les numéros de vos services");
+  return missing;
+}
+
 function Recap({ profile, onEdit }: { profile: DealershipProfile; onEdit: (s: StepId) => void }) {
   const a = profile.agent;
   const host = hostOf(profile.website);
   const cities = [...new Set(profile.sites.map((s) => s.city).filter(Boolean))];
   const hours = profile.hours[0];
+  const missing = missingInfo(profile);
   return (
+    <>
+    {missing.length > 0 && (
+      <Callout tone="warning" className="mb-3">
+        <p>
+          <span className="font-medium">À compléter :</span> {missing.join(", ")}. Sans ces informations, {a.name} prend les messages mais ne peut
+          pas renseigner vos clients.{" "}
+          <button type="button" onClick={() => onEdit(3)} className="font-medium text-foreground underline underline-offset-4">
+            Compléter maintenant
+          </button>
+        </p>
+      </Callout>
+    )}
     <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-soft">
       <RecapRow
         icon={<Building />}
@@ -68,19 +90,21 @@ function Recap({ profile, onEdit }: { profile: DealershipProfile; onEdit: (s: St
         }
         onEdit={() => onEdit(3)}
       />
-      {hours && (
-        <RecapRow
-          icon={<Clock />}
-          label="Horaires"
-          value={
+      <RecapRow
+        icon={<Clock />}
+        label="Horaires"
+        value={
+          hours ? (
             <span className="text-[13px]">
               {hours.label} : {hours.value}
               {profile.hours.length > 1 && <span className="text-muted-foreground"> · +{profile.hours.length - 1}</span>}
             </span>
-          }
-          onEdit={() => onEdit(3)}
-        />
-      )}
+          ) : (
+            <span className="text-[13px] text-muted-foreground">Non renseignés</span>
+          )
+        }
+        onEdit={() => onEdit(3)}
+      />
       <RecapRow
         icon={<Mic />}
         label="Votre agent"
@@ -97,6 +121,7 @@ function Recap({ profile, onEdit }: { profile: DealershipProfile; onEdit: (s: St
         onEdit={() => onEdit(4)}
       />
     </div>
+    </>
   );
 }
 
@@ -197,6 +222,7 @@ export function StepActivate({
   golive,
   onGoliveChange,
   onActivated,
+  tools,
   onEdit,
   onRestart,
   onBack,
@@ -206,6 +232,8 @@ export function StepActivate({
   golive: GoLive;
   onGoliveChange: (fn: (g: GoLive) => GoLive) => void;
   onActivated: (a: Activation) => void;
+  /** DMS / CRM declared at step 5, passed on to the Ossian team. */
+  tools?: { dms?: string; crm?: string };
   onEdit: (s: StepId) => void;
   onRestart: () => void;
   onBack: () => void;
@@ -255,7 +283,8 @@ export function StepActivate({
         body: JSON.stringify({
           email,
           fallback: golive.fallback.trim() || undefined,
-          source: source === "ai" ? "ai" : source === "simulated" || source === "demo" ? "simulated" : "manual",
+          source: source === "ai" ? "ai" : "manual",
+          tools,
           profile,
         }),
       });
@@ -295,7 +324,7 @@ export function StepActivate({
             Activez {agent} en <span className="font-serif-accent">un clic</span>.
           </>
         }
-        description={`${profile.agent.name || "Votre agent"} est configurée à partir de votre site. Indiquez où recevoir les comptes-rendus : nous créons votre compte et votre ligne immédiatement.`}
+        description={`${source === "ai" ? `${profile.agent.name || "Votre agent"} est configurée à partir de votre site. ` : ""}Indiquez où recevoir les comptes-rendus : nous créons votre compte et votre ligne immédiatement.`}
       />
 
       <Recap profile={profile} onEdit={onEdit} />

@@ -21,7 +21,7 @@ résumés, KPI, CA généré).
 | Site marketing | `/` | ✅ complet (ROI, tarifs, FAQ…) |
 | **Démo vocale** (parler à l'agent dans le navigateur) | `/demo` | ✅ Claude en temps réel si `ANTHROPIC_API_KEY`, sinon mode simulé |
 | **Onboarding en un clic** (URL du site → agent prêt → Activer) | `/onboarding`, `POST /api/onboarding/activate` | ✅ compte + numéro du stock + lien d'accès privé, vérification de la ligne en direct |
-| Tableau de bord | `/app/*` | ✅ données réelles de la concession connectée (vue d'ensemble, appels) ; démo réaliste sinon |
+| Tableau de bord | `/app/*` | ✅ concession connectée : **uniquement ses données réelles** (appels, RDV à confirmer, leads, rappels, agent modifiable, intégrations sur demande, paramètres) ; démo réaliste pour les visiteurs |
 | Moteur conversationnel | `lib/agent/*`, `POST /api/agent` | ✅ prompt, 8 outils métier, boucle d'outils streamée |
 | Analyse de site | `lib/onboarding/*`, `POST /api/onboarding/analyze` | ✅ |
 | **Téléphonie Vapi** | `POST /api/voice/vapi`, `POST /api/voice/llm/chat/completions` | ✅ prêt, à brancher sur un numéro ([guide](VAPI.md)) |
@@ -44,6 +44,7 @@ app/
   api/onboarding/analyze      analyse du site (NDJSON streaming)
   api/onboarding/activate     activation en un clic (compte, numéro, cookie, e-mail de bienvenue)
   api/onboarding/status       état de la ligne (premier appel reçu ?) pour la vérification en direct
+  api/account/*               compte connecté : profil de l'agent, suivi RDV/leads/rappels, demandes à l'équipe
   api/voice/vapi              webhook téléphonie
   api/voice/llm/...           endpoint LLM compatible "custom-llm" (Vapi)
   api/tts                     proxy ElevenLabs (optionnel)
@@ -70,7 +71,7 @@ lib/
   demo/*                      données de démonstration
 config/dealerships.json       registre numéro → profil pour les pilotes (sans base de données)
 scripts/vapi.mjs              configuration Vapi en ligne de commande (npm run vapi)
-supabase/migrations/          schéma Postgres multi-tenant + RLS, fonctions d'onboarding (0002–0004)
+supabase/migrations/          schéma Postgres multi-tenant + RLS, fonctions d'onboarding et de compte (0002–0005)
 ```
 
 ## 3. Architecture cible (production)
@@ -141,9 +142,10 @@ Parcours réel (implémenté) : **URL du site → analyse (≈ 45 s) → Activer
 | Étape | Automatisation | Temps client |
 |---|---|---|
 | 1. URL du site | **Claude lit le site** (web fetch + search) et remplit horaires, marques, sites, prestations, services, FAQ ; l'agent (nom, voix, langues, accueil) est généré | 10 s + ≈ 45 s d'attente |
+| 1 bis. Site illisible | rien n'est inventé : formulaire à compléter (horaires, prestations, numéros), puis Activer | 2 min |
 | 2. Activer | un seul formulaire : e-mail + numéro de transfert (pré-rempli depuis le site). Un clic crée l'organisation, la concession et ses sites, **attribue un numéro du stock pré-provisionné**, règle le numéro de secours sur Vapi, connecte le navigateur et envoie l'e-mail de bienvenue | 15 s |
 | 3. Renvoi d'appel | codes affichés avec le vrai numéro (mobile) + consigne pour fixe/standard ; **le premier appel reçu valide la ligne en direct** (écran et tableau de bord) | 1–2 min |
-| Facultatif | vérifier/éditer le profil, la voix, les connexions DMS/CRM : avant ou après l'activation | — |
+| Facultatif | vérifier/éditer le profil et la voix, déclarer son DMS/CRM : avant l'activation, ou ensuite depuis le tableau de bord (page Agent) | — |
 | À venir | paiement Stripe (essai), connecteur DMS, rapport hebdo, suggestions d'amélioration auto | — |
 
 **Comment c'est branché.** L'app appelle des fonctions Postgres `SECURITY DEFINER` via l'API REST de Supabase
@@ -151,7 +153,14 @@ avec la clé *publishable* et une **clé serveur** (`OSSIAN_DB_KEY`) vérifiée 
 SHA-256 dans un schéma privé) ; les tables restent fermées par RLS et la clé *service role* n'est jamais
 utilisée par l'app. Fonctions : `ossian_activate`, `ossian_resolve_number`, `ossian_mark_first_call`,
 `ossian_log_call`, `ossian_log_event`, `ossian_dashboard`, `ossian_pool_add` (attribue d'office aux concessions
-en attente), `ossian_pool_status`.
+en attente), `ossian_pool_status`, `ossian_update_profile` (l'agent modifié depuis le tableau de bord répond dès
+l'appel suivant) et `ossian_update_item` (RDV confirmé / venu / absent, étape d'un lead, rappel fait).
+
+**Aucune donnée inventée pour un vrai compte.** Si le site ne peut pas être lu (pas de clé Anthropic, site
+inaccessible), seuls le nom et l'adresse du site sont pré-remplis : horaires, prestations et numéros restent vides
+et l'écran d'activation signale ce qui manque. L'étape « Vos outils » ne simule aucune connexion : le DMS et le CRM
+déclarés sont transmis à l'équipe Ossian avec la notification d'activation, et la page Intégrations envoie de vraies
+demandes de connexion (webhook et e-mail `OSSIAN_TEAM_EMAIL`).
 
 **Accès au tableau de bord.** Pas de mot de passe pour le pilote : un lien privé `/acces/<jeton>` (jeton
 aléatoire de 192 bits, stocké haché) pose un cookie httpOnly de 180 jours. Supabase Auth (liens magiques,
@@ -233,7 +242,7 @@ n'est pas adapté : le cerveau de l'agent doit rester le nôtre.
    `npm run vapi -- check` puis `pool-add` pour remplir le stock ([guide](VAPI.md)). Notifications de
    l'équipe via un webhook Slack/Teams. Test interne, puis 1 à 3 concessions pilotes en renvoi sur non-réponse.
 2. **Semaines 2–4** : ✅ Supabase et onboarding en un clic (fait) ; Upstash Redis (mémoire d'appel partagée),
-   e-mails Resend, pages RDV / leads / rappels du tableau de bord sur données réelles, Supabase Auth (équipes),
+   e-mails Resend, ✅ tableau de bord 100 % données réelles (fait), Supabase Auth (équipes),
    benchmark Opus / Sonnet / Haiku sur appels réels, SMS de confirmation.
 3. **Semaines 4–8 — Intégrations** : premier connecteur DMS (selon clients), CRM, campagnes sortantes, Stripe,
    multi-sites.

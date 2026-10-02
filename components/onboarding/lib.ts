@@ -1,4 +1,4 @@
-import { DEMO_PROFILE } from "@/lib/demo/profile";
+import { STARTER_DEPARTMENTS, STARTER_POLICY } from "@/lib/onboarding/simulate";
 import type { DealershipProfile, LanguageCode } from "@/lib/domain/types";
 
 /* ------------------------------------------------------------------ */
@@ -12,7 +12,7 @@ export const STEPS: { id: StepId; label: string; hint: string; eta: string; opti
   { id: 2, label: "Analyse", hint: "Lecture de votre site", eta: "45 s" },
   { id: 3, label: "Vérification", hint: "Sites, horaires, prestations", eta: "1 min 20", optional: true },
   { id: 4, label: "Votre agent", hint: "Voix, ton et accueil", eta: "50 s", optional: true },
-  { id: 5, label: "Connexions", hint: "DMS, agenda, alertes", eta: "30 s", optional: true },
+  { id: 5, label: "Vos outils", hint: "DMS et CRM", eta: "30 s", optional: true },
   { id: 6, label: "Activation", hint: "Un clic, puis le renvoi d'appel", eta: "10 s" },
 ];
 
@@ -254,45 +254,15 @@ export function emptyProfile(name = "", website?: string): DealershipProfile {
   };
 }
 
-/** "Je n'ai pas de site web": typical dealership values, blank identity. */
-export function templateProfile(name = ""): DealershipProfile {
-  const p = structuredClone(DEMO_PROFILE);
-  return {
-    id: uid("onb"),
-    name,
-    group: undefined,
-    website: undefined,
-    description: "",
-    brands: [],
-    sites: [{ id: uid("site"), name, address: "", city: "", phone: "", brands: [] }],
-    hours: p.hours,
-    services: p.services,
-    departments: p.departments.map((d) => ({ ...d, phone: "", email: undefined })),
-    policies: p.policies,
-    faq: p.faq,
-    agent: { ...p.agent, greeting: buildGreeting(name, p.agent.name, p.agent.voiceId) },
-  };
-}
-
-/** Fallback when the analysis fails: the demo dealership, renamed after the URL. */
-export function demoProfileFor(url: string, typedName?: string): DealershipProfile {
-  const host = hostOf(url);
-  const name = typedName?.trim() || nameFromUrl(url) || "Votre concession";
-  const p = structuredClone(DEMO_PROFILE);
-  const rename = (s: string) => s.replace(/Mistral Occasions/g, `${name} Occasions`).replace(/Mistral Automobiles/g, name);
+/** "Je n'ai pas de site web" / site unreadable: name (and website) only, nothing invented. */
+export function templateProfile(name = "", website?: string): DealershipProfile {
+  const p = emptyProfile(name, website);
   return {
     ...p,
-    id: uid("demo"),
-    name,
-    group: undefined,
-    website: url || undefined,
-    description: `${name} : ventes de véhicules neufs et d'occasion, atelier toutes marques, carrosserie et magasin de pièces.`,
-    sites: p.sites.map((s) => ({ ...s, name: rename(s.name) })),
-    departments: p.departments.map((d) => ({
-      ...d,
-      email: d.email && host ? d.email.replace("mistral-automobiles.fr", host) : d.email,
-    })),
-    agent: { ...p.agent, greeting: buildGreeting(name, p.agent.name, p.agent.voiceId) },
+    sites: [{ id: uid("site"), name, address: "", city: "", phone: "", brands: [] }],
+    departments: STARTER_DEPARTMENTS.map((d) => ({ ...d })),
+    policies: [STARTER_POLICY],
+    agent: { ...p.agent, smsConfirmation: false },
   };
 }
 

@@ -4,7 +4,9 @@ import { AppointmentsView } from "@/components/app/appointments/appointments-vie
 import type { CalAppointment, WeekInfo } from "@/components/app/appointments/types";
 import { Page } from "@/components/app/page-header";
 import { ToastButton } from "@/components/app/toast-button";
+import { LiveAppointments } from "@/components/app/live/live-appointments";
 import { getAppointments } from "@/lib/demo/data";
+import { getAccount } from "@/lib/server/account";
 import { addDays, parisParts } from "@/lib/agent/time";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +18,20 @@ const MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "aoû
 const MONTHS_LONG = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 
 /* Appointments are real instants; the grid is laid out in Paris time whatever the server TZ. */
-export default function AppointmentsPage() {
+export default async function AppointmentsPage() {
   const now = new Date();
+  const account = await getAccount();
+  if (account) {
+    const agent = account.dealership.agent_name ?? "Léa";
+    return (
+      <Page
+        title="Rendez-vous"
+        subtitle={`Les demandes de rendez-vous notées par ${agent} au téléphone. Confirmez-les dans votre planning, puis pointez-les ici.`}
+      >
+        <LiveAppointments appointments={account.appointments} now={now.toISOString()} />
+      </Page>
+    );
+  }
   const appts = getAppointments(now);
 
   // Everything in Paris time so the grid matches the times shown elsewhere.

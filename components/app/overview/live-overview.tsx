@@ -1,4 +1,5 @@
-import { CalendarClock, Mic, PhoneCall, PhoneIncoming, Sparkles, UserRound } from "lucide-react";
+import Link from "next/link";
+import { CalendarClock, Mic, PhoneCall, PhoneIncoming, Sparkles } from "lucide-react";
 import { ActivityFeed } from "@/components/app/overview/activity-feed";
 import { EmptyState } from "@/components/app/empty-state";
 import { fmtDayShort, fmtTime, parisParts, relTime } from "@/components/app/format";
@@ -10,6 +11,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { goLiveState, toCallRecords } from "@/lib/server/account-view";
 import type { Dashboard } from "@/lib/server/db";
 import { formatFrench } from "@/lib/voice/phone";
+import { CallbackList } from "../live/callback-list";
 import { GoLivePanel } from "./go-live-panel";
 
 const phone = (p: string) => (p.startsWith("+") ? formatFrench(p) : p);
@@ -18,11 +20,13 @@ function ListCard({
   title,
   description,
   empty,
+  href,
   children,
 }: {
   title: string;
   description: string;
   empty: string;
+  href: string;
   children: React.ReactNode[];
 }) {
   return (
@@ -32,6 +36,9 @@ function ListCard({
           <CardTitle>{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </div>
+        <Link href={href} className="shrink-0 text-[13px] text-muted-foreground transition-colors hover:text-foreground">
+          Tout voir
+        </Link>
       </CardHeader>
       {children.length ? (
         <ul className="divide-y divide-border">{children}</ul>
@@ -86,9 +93,14 @@ export function LiveOverview({ account, welcome }: { account: Dashboard; welcome
             label="Demandes de RDV"
             icon={<CalendarClock />}
             value={account.appointments.length}
-            hint="À confirmer dans votre agenda"
+            hint={`${account.appointments.filter((a) => a.status === "en_attente").length} à confirmer`}
           />
-          <StatTile label="Leads" icon={<Sparkles />} value={account.leads.length} hint="Ventes VN / VO, reprises" />
+          <StatTile
+            label="Leads"
+            icon={<Sparkles />}
+            value={account.leads.length}
+            hint={`${account.leads.filter((l) => l.stage === "nouveau").length} à contacter`}
+          />
           <StatTile
             label="Rappels à faire"
             icon={<PhoneCall />}
@@ -112,27 +124,26 @@ export function LiveOverview({ account, welcome }: { account: Dashboard; welcome
             )}
           </div>
           <div className="grid content-start gap-4 md:grid-cols-2 md:gap-5 xl:grid-cols-1">
-            <ListCard title="Rappels à faire" description="Clients qui attendent un appel de votre équipe" empty="Aucun rappel en attente.">
-              {openCallbacks.slice(0, 6).map((c) => (
-                <li key={c.id} className="flex items-start gap-3 px-5 py-3">
-                  <UserRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-2 text-[13px] font-medium text-foreground">
-                      <span className="truncate">{c.name ?? phone(c.phone)}</span>
-                      {c.priority === "haute" && <Badge tone="danger">Urgent</Badge>}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {c.reason} · {c.department}
-                    </p>
-                  </div>
-                  <a href={`tel:${c.phone}`} className="shrink-0 font-mono text-xs text-primary tabular hover:underline">
-                    {phone(c.phone)}
-                  </a>
-                </li>
-              ))}
-            </ListCard>
-            <ListCard title="Demandes de rendez-vous" description="Créneaux proposés par l'agent, à confirmer" empty="Aucune demande pour l'instant.">
-              {account.appointments.slice(0, 6).map((a) => (
+            <Card className="flex flex-col">
+              <CardHeader>
+                <div>
+                  <CardTitle>Rappels à faire</CardTitle>
+                  <CardDescription>Clients qui attendent un appel de votre équipe</CardDescription>
+                </div>
+              </CardHeader>
+              {openCallbacks.length ? (
+                <CallbackList callbacks={openCallbacks.slice(0, 8)} />
+              ) : (
+                <p className="px-5 py-6 text-[13px] text-muted-foreground">Aucun rappel en attente.</p>
+              )}
+            </Card>
+            <ListCard
+              title="Demandes de rendez-vous"
+              description="Créneaux notés par l'agent, à confirmer"
+              empty="Aucune demande à confirmer."
+              href="/app/appointments"
+            >
+              {account.appointments.filter((a) => a.status === "en_attente").slice(0, 6).map((a) => (
                 <li key={a.id} className="flex items-start gap-3 px-5 py-3">
                   <CalendarClock className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 flex-1">
@@ -152,8 +163,8 @@ export function LiveOverview({ account, welcome }: { account: Dashboard; welcome
                 </li>
               ))}
             </ListCard>
-            <ListCard title="Leads" description="Projets d'achat détectés au téléphone" empty="Aucun lead pour l'instant.">
-              {account.leads.slice(0, 6).map((l) => (
+            <ListCard title="Leads" description="Projets d'achat détectés au téléphone" empty="Aucun nouveau lead à contacter." href="/app/leads">
+              {account.leads.filter((l) => l.stage === "nouveau").slice(0, 6).map((l) => (
                 <li key={l.id} className="flex items-start gap-3 px-5 py-3">
                   <Sparkles className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 flex-1">

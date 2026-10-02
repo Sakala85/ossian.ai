@@ -17,6 +17,7 @@ const Body = z.object({
   email: z.string().trim().toLowerCase().email().max(200),
   fallback: z.string().max(40).optional(),
   source: z.enum(["ai", "manual", "simulated"]).default("ai"),
+  tools: z.object({ dms: z.string().max(60).optional(), crm: z.string().max(60).optional() }).optional(),
   profile: z
     .object({
       name: z.string().trim().min(1).max(160),
@@ -64,6 +65,8 @@ export async function POST(req: Request) {
         Site: profile.website,
         Numéro: a.phone ? formatFrench(a.phone.e164) : "à attribuer",
         Secours: fallback ? formatFrench(fallback) : undefined,
+        DMS: parsed.data.tools?.dms,
+        CRM: parsed.data.tools?.crm,
       }),
     ]);
 
