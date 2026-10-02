@@ -77,7 +77,7 @@ export function Sheet({
             aria-label={label}
             tabIndex={-1}
             className={cn(
-              "absolute inset-y-0 right-0 flex w-full max-w-[580px] flex-col border-l border-border bg-background shadow-float outline-none sm:inset-y-2 sm:right-2 sm:rounded-2xl sm:border",
+              "absolute inset-y-0 right-0 flex w-full max-w-[580px] flex-col overflow-hidden border-l border-border bg-background shadow-float outline-none sm:inset-y-2 sm:right-2 sm:rounded-2xl sm:border",
               className,
             )}
             initial={{ x: 40, opacity: 0 }}

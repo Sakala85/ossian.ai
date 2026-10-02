@@ -48,7 +48,7 @@ export function AppointmentsView({ items, week }: { items: CalAppointment[]; wee
           label="Taux de no-show"
           value={stats.noShow === null ? "—" : pct(stats.noShow, 1)}
           delta={stats.noShow === null ? undefined : <Delta value={-0.6} goodWhenUp={false} label="−6 pts" />}
-          hint={stats.noShow === null ? "Aucun RDV passé cette semaine" : `${stats.noShows} absence(s) · rappel SMS J−1 actif`}
+          hint={stats.noShow === null ? "Aucun RDV passé cette semaine" : `${stats.noShows} absence${stats.noShows > 1 ? "s" : ""} · rappel SMS J−1 actif`}
         />
         <StatTile label="CA atelier estimé" value={euro(stats.revenue)} hint="Valeur estimée des RDV de la semaine" />
       </div>

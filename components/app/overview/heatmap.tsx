@@ -24,7 +24,17 @@ const LABEL_W = 34;
 const CELL_H = 18;
 const GAP = 2;
 
-export function Heatmap({ grid }: { grid: number[][] }) {
+/**
+ * `grid` is a typical-week shape (Mon..Sun × 0..23); `total` rescales it to the
+ * real call volume of the last 4 weeks so tooltips agree with the KPIs.
+ * `share` / `perDay` come from the daily stats (same source as the KPI row).
+ */
+export function Heatmap({ grid: shape, total, share, perDay }: { grid: number[][]; total: number; share: number; perDay: number }) {
+  const grid = useMemo(() => {
+    const sum = shape.flat().reduce((a, b) => a + b, 0) || 1;
+    return shape.map((row) => row.map((v) => Math.round((v / sum) * total)));
+  }, [shape, total]);
+
   const [mode, setMode] = useState<"after" | "all">("after");
   const [active, setActive] = useState<{ d: number; h: number } | null>(null);
 
@@ -39,7 +49,7 @@ export function Heatmap({ grid }: { grid: number[][] }) {
         max = Math.max(max, v);
       }),
     );
-    return { total, after, max, share: total ? after / total : 0 };
+    return { total, after, max };
   }, [grid]);
 
   const level = (v: number) => (v <= 0 ? 0 : Math.max(1, Math.ceil((v / stats.max) * 5)));
@@ -72,7 +82,7 @@ export function Heatmap({ grid }: { grid: number[][] }) {
       <div className="flex flex-wrap items-start justify-between gap-4 px-5 pt-5">
         <div className="min-w-0">
           <h2 className="text-sm font-medium tracking-tight">Quand vos clients appellent</h2>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">Semaine type · appels par créneau horaire</p>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">Appels par jour et par heure · 4 dernières semaines</p>
         </div>
         <Segmented
           size="sm"
@@ -87,12 +97,12 @@ export function Heatmap({ grid }: { grid: number[][] }) {
 
       <div className="flex flex-wrap items-end gap-x-8 gap-y-2 px-5 pt-4">
         <div>
-          <div className="text-[28px] leading-none font-semibold tracking-[-0.03em]">{pct(stats.share)}</div>
+          <div className="text-[28px] leading-none font-semibold tracking-[-0.03em]">{pct(share)}</div>
           <p className="mt-1.5 text-xs text-muted-foreground">des appels arrivent en dehors des horaires d&apos;ouverture</p>
         </div>
         <div className="max-w-xs text-xs text-muted-foreground">
-          Soit <span className="font-medium text-foreground tabular">{num(Math.round(stats.after / 7))}</span> appels par jour
-          qui tombaient sur répondeur. Léa les traite tous, y compris le dimanche.
+          Soit <span className="font-medium text-foreground tabular">{num(perDay)}</span> appels par jour en moyenne qui
+          tombaient sur répondeur. Léa les traite tous, y compris le dimanche.
         </div>
       </div>
 
@@ -101,7 +111,7 @@ export function Heatmap({ grid }: { grid: number[][] }) {
           className="relative rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
           tabIndex={0}
           role="group"
-          aria-label={`Carte de chaleur des appels. ${pct(stats.share)} hors horaires. Utilisez les flèches pour parcourir les créneaux.`}
+          aria-label={`Carte de chaleur des appels sur 4 semaines. ${pct(share)} hors horaires. Utilisez les flèches pour parcourir les créneaux.`}
           onKeyDown={onKey}
           onBlur={() => setActive(null)}
           onPointerLeave={() => setActive(null)}

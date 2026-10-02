@@ -11,6 +11,7 @@ import type {
   Sentiment,
 } from "@/lib/domain/types";
 import { getDemoCalls } from "./calls";
+import { addDays, parisParts, parisToUtc, weekdayOf } from "@/lib/agent/time";
 import { ADVISORS, DEMO_PROFILE, SALESPEOPLE } from "./profile";
 
 /** Small deterministic PRNG so server and client render identical demo data. */
@@ -27,25 +28,17 @@ function rng(seed: number) {
 
 const pick = <T,>(r: () => number, arr: readonly T[]) => arr[Math.floor(r() * arr.length)]!;
 
-function startOfDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
 /* ------------------------------------------------------------------ */
 /* Daily stats (last 30 days)                                          */
 /* ------------------------------------------------------------------ */
 export function getDailyStats(now = new Date(), days = 30): DailyStat[] {
-  const today = startOfDay(now);
+  const today = parisParts(now).date;
   const out: DailyStat[] = [];
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
+    const key = addDays(today, -i);
     // Seeded per calendar day so every window (7/30/60/90 j) shows the same numbers for a given day.
     const r = rng([...key].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619), 2166136261));
-    const dow = d.getDay();
+    const dow = weekdayOf(key);
     const base = dow === 0 ? 9 : dow === 6 ? 28 : dow === 1 ? 64 : 52;
     const ramp = 1 + (90 - Math.min(i, 90)) * 0.003; // adoption grows slowly
     const calls = Math.round(base * ramp * (0.86 + r() * 0.28));
@@ -243,21 +236,20 @@ const SERVICES = [
 
 export function getAppointments(now = new Date()): Appointment[] {
   const r = rng(2024);
-  const monday = startOfDay(now);
-  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  // Week grid in Paris time, whatever the server time zone.
+  const today = parisParts(now);
+  const monday = addDays(today.date, -((today.weekday + 6) % 7));
   const out: Appointment[] = [];
   let id = 1000;
   for (let day = 0; day < 6; day++) {
-    const count = day === 5 ? 5 : 9 + Math.floor(r() * 4);
+    const count = day === 5 ? 4 : 7 + Math.floor(r() * 3);
     const slots = new Set<number>();
     while (slots.size < count) {
       const m = day === 5 ? 8 * 60 + Math.floor(r() * 7) * 30 : [7.75, 8, 8.5, 9, 9.25, 10, 10.5, 11, 13.5, 14, 14.5, 15, 16, 16.5, 17][Math.floor(r() * 15)]! * 60;
       slots.add(m);
     }
     for (const m of [...slots].sort((a, b) => a - b)) {
-      const start = new Date(monday);
-      start.setDate(start.getDate() + day);
-      start.setHours(0, m, 0, 0);
+      const start = parisToUtc(addDays(monday, day), m);
       const [service, durationMin, value] = pick(r, SERVICES);
       const [make, model] = pick(r, CARS);
       const past = start.getTime() < now.getTime();

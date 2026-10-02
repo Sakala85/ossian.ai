@@ -57,3 +57,12 @@ export function nowLabel(d = new Date()) {
   const p = parisParts(d);
   return `${frenchDate(p.date)} ${p.date.slice(0, 4)}, ${frenchTime(p.hour * 60 + p.minute)} (heure de Paris)`;
 }
+
+/** The UTC instant at which it is `minutes` past midnight on `date` (YYYY-MM-DD) in Paris. */
+export function parisToUtc(date: string, minutes: number) {
+  const [y, m, d] = date.split("-").map(Number);
+  const guess = Date.UTC(y!, m! - 1, d!, 0, minutes);
+  const p = parisParts(new Date(guess));
+  const local = Date.UTC(Number(p.date.slice(0, 4)), Number(p.date.slice(5, 7)) - 1, Number(p.date.slice(8, 10)), p.hour, p.minute);
+  return new Date(guess - (local - guess));
+}

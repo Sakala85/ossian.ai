@@ -10,6 +10,7 @@ import {
   MessageSquare,
   PhoneForwarded,
   UserPlus,
+  UserRound,
   UserSearch,
   Wrench,
   Zap,
@@ -17,7 +18,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { TranscriptLine } from "@/lib/domain/types";
-import { cn, duration } from "@/lib/utils";
+import { cn, duration, initials } from "@/lib/utils";
 import { MiniOrb } from "../mini-orb";
 
 const TOOL_ICONS: Record<string, LucideIcon> = {
@@ -68,8 +69,10 @@ export function Transcript({
   activeT,
   onSeek,
   partial,
+  callerName,
 }: {
   lines: TranscriptLine[];
+  callerName?: string;
   /** Current playback position; highlights the line being spoken. */
   activeT?: number;
   onSeek?: (t: number) => void;
@@ -84,7 +87,7 @@ export function Transcript({
         l.role === "tool" && l.tool ? (
           <ToolChip key={i} line={l} />
         ) : (
-          <Bubble key={i} line={l} active={i === activeIndex} onSeek={onSeek} />
+          <Bubble key={i} line={l} active={i === activeIndex} onSeek={onSeek} callerName={callerName} />
         ),
       )}
       {partial && (
@@ -100,20 +103,30 @@ export function Transcript({
   );
 }
 
-function Bubble({ line, active, onSeek }: { line: TranscriptLine; active: boolean; onSeek?: (t: number) => void }) {
+function Bubble({
+  line,
+  active,
+  onSeek,
+  callerName,
+}: {
+  line: TranscriptLine;
+  active: boolean;
+  onSeek?: (t: number) => void;
+  callerName?: string;
+}) {
   const agent = line.role === "agent";
   return (
     <div className={cn("flex gap-2.5", agent ? "pr-8 sm:pr-14" : "flex-row-reverse pl-8 sm:pl-14")}>
       {agent ? (
         <MiniOrb size={24} className="mt-5" />
       ) : (
-        <span className="mt-5 inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">
-          Cl
+        <span className="mt-5 inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground [&_svg]:size-3">
+          {callerName ? initials(callerName) : <UserRound />}
         </span>
       )}
       <div className={cn("min-w-0", !agent && "flex flex-col items-end")}>
         <div className={cn("mb-1 flex items-center gap-2 text-[11px] text-muted-foreground", !agent && "flex-row-reverse")}>
-          <span className="font-medium">{agent ? "Léa" : "Client"}</span>
+          <span className="font-medium">{agent ? "Léa" : (callerName?.split(" ")[0] ?? "Appelant")}</span>
           <button
             type="button"
             onClick={() => onSeek?.(line.t)}

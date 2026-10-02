@@ -65,7 +65,7 @@ export function AgentPreview({
         <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Aperçu de l&apos;agent</span>
         {live ? (
           <Badge tone="success">
-            <LiveDot className="size-1.5" />
+            <LiveDot />
             En ligne
           </Badge>
         ) : (

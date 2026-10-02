@@ -33,12 +33,20 @@ export function LeadCard({
   const hot = lead.score >= 75 && (lead.stage === "nouveau" || lead.stage === "contacte");
   const closed = lead.stage === "gagne" || lead.stage === "perdu";
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      aria-label={`${lead.name}, ${lead.vehicle}, score ${lead.score}`}
       className={cn(
         "group w-full cursor-grab rounded-lg border border-border bg-card p-3 text-left shadow-soft transition-[border-color,box-shadow,opacity,transform] hover:border-border-strong hover:shadow-[0_6px_20px_-10px_hsl(var(--shadow-color)/0.3)] active:cursor-grabbing",
         dragging && "rotate-1 opacity-50",
@@ -77,6 +85,6 @@ export function LeadCard({
           <Clock /> {age(lead.createdAt, now)}
         </span>
       </div>
-    </button>
+    </div>
   );
 }

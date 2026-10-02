@@ -18,23 +18,19 @@ export function usePlayback(total: number) {
       last.current = null;
       return;
     }
-    let raf = 0;
-    const tick = (now: number) => {
-      const prev = last.current ?? now;
+    last.current = performance.now();
+    const id = setInterval(() => {
+      const now = performance.now();
+      const dt = ((now - (last.current ?? now)) / 1000) * speed;
       last.current = now;
-      setT((cur) => {
-        const next = cur + ((now - prev) / 1000) * speed;
-        if (next >= total) {
-          setPlaying(false);
-          return total;
-        }
-        return next;
-      });
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+      setT((cur) => Math.min(total, cur + dt));
+    }, 80);
+    return () => clearInterval(id);
   }, [playing, speed, total]);
+
+  useEffect(() => {
+    if (playing && t >= total) setPlaying(false);
+  }, [playing, t, total]);
 
   const toggle = useCallback(() => {
     if (!playing && t >= total) setT(0);
@@ -64,7 +60,7 @@ function bars(seed: string, n: number) {
 
 export function AudioPlayer({ id, playback, onDownload }: { id: string; playback: Playback; onDownload?: () => void }) {
   const { t, playing, speed, toggle, seek, cycleSpeed, total } = playback;
-  const N = 72;
+  const N = 56;
   const heights = useMemo(() => bars(id, N), [id]);
   const progress = total ? t / total : 0;
   const trackRef = useRef<HTMLDivElement>(null);

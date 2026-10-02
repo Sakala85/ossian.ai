@@ -184,7 +184,7 @@ export function CallDetail({
             <SectionTitle hint={`${call.transcript.filter((l) => l.role !== "tool").length} messages · ${call.transcript.filter((l) => l.role === "tool").length} actions`}>
               Transcription
             </SectionTitle>
-            <Transcript lines={call.transcript} activeT={playback.t} onSeek={(t) => playback.seek(t)} partial={partial} />
+            <Transcript lines={call.transcript} activeT={playback.t} onSeek={(t) => playback.seek(t)} partial={partial} callerName={call.caller.name} />
           </section>
         </div>
       </div>

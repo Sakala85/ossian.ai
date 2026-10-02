@@ -19,10 +19,10 @@ export type KpiData = {
 };
 
 export function KpiRow({ k }: { k: KpiData }) {
-  const vs = "vs 30 j précédents";
+  const vs = "vs 30 j préc.";
   const gain = Math.round((1 - k.answerRateBefore) * 100);
   return (
-    <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3 min-[1360px]:grid-cols-6">
       <StatTile
         label="Appels traités"
         icon={<PhoneIncoming />}
@@ -38,20 +38,20 @@ export function KpiRow({ k }: { k: KpiData }) {
         icon={<PhoneCall />}
         value="100 %"
         delta={<Delta value={gain} label={`+${gain} pts`} />}
-        hint="Décroché en 0,8 s en moyenne"
+        hint="vs avant Ossian"
       >
         <div className="grid gap-1.5 text-[11px] text-muted-foreground">
           <div className="flex items-center gap-2">
             <span className="w-10 shrink-0">Ossian</span>
             <span className="h-1.5 flex-1 rounded-full bg-chart-1" />
-            <span className="w-8 text-right text-foreground tabular">100 %</span>
+            <span className="w-10 shrink-0 text-right whitespace-nowrap text-foreground tabular">100&nbsp;%</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-10 shrink-0">Avant</span>
             <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
               <span className="block h-full rounded-full bg-muted-foreground/45" style={{ width: `${k.answerRateBefore * 100}%` }} />
             </span>
-            <span className="w-8 text-right tabular">{pct(k.answerRateBefore)}</span>
+            <span className="w-10 shrink-0 text-right whitespace-nowrap tabular">{pct(k.answerRateBefore)}</span>
           </div>
         </div>
       </StatTile>
@@ -81,7 +81,7 @@ export function KpiRow({ k }: { k: KpiData }) {
         icon={<Euro />}
         value={euroCompact(k.revenue)}
         delta={<Delta value={k.revenueDelta} label={signedPct(k.revenueDelta)} />}
-        hint="RDV atelier + leads qualifiés"
+        hint={vs}
       >
         <Sparkline values={k.series.revenue} label="CA estimé par jour" />
       </StatTile>
@@ -92,7 +92,7 @@ export function KpiRow({ k }: { k: KpiData }) {
         value={num(k.hoursSaved)}
         unit="h"
         delta={<Delta value={k.callsDelta} label={signedPct(k.callsDelta)} />}
-        hint="≈ 3,4 min de standard par appel"
+        hint={vs}
       >
         <Sparkline values={k.series.hours} label="Heures libérées par jour" />
       </StatTile>

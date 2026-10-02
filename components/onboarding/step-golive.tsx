@@ -223,7 +223,7 @@ function LiveSuccess({ profile, golive, onRestart }: { profile: DealershipProfil
         </motion.div>
       </div>
       <Badge tone="success" className="mt-2">
-        <LiveDot className="size-1.5" />
+        <LiveDot />
         En production
       </Badge>
       <h1 ref={ref} tabIndex={-1} className="mt-5 font-display text-[44px] font-medium text-balance text-foreground focus:outline-none sm:text-6xl">

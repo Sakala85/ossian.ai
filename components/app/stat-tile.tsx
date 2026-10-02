@@ -60,14 +60,16 @@ export function StatTile({
         {icon}
         <span className="truncate">{label}</span>
       </div>
-      <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-[26px] leading-none font-semibold tracking-[-0.03em] text-foreground">
-          {value}
-          {unit && <span className="ml-0.5 text-base font-medium text-muted-foreground">{unit}</span>}
-        </span>
-        {delta}
+      <div className="mt-2 truncate text-[26px] leading-[1.1] font-semibold tracking-[-0.03em] text-foreground">
+        {value}
+        {unit && <span className="ml-0.5 text-base font-medium text-muted-foreground">{unit}</span>}
       </div>
-      {hint && <div className="mt-1.5 text-xs text-muted-foreground">{hint}</div>}
+      {(delta || hint) && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+          {delta}
+          {hint && <span className="min-w-0">{hint}</span>}
+        </div>
+      )}
       {children && <div className="mt-auto pt-3">{children}</div>}
     </div>
   );

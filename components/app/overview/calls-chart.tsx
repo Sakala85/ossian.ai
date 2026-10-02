@@ -106,7 +106,7 @@ export function CallsChart({ data }: { data: DayPoint[] }) {
       </ul>
 
       <div className="px-3 pt-2 pb-3 sm:px-4">
-        <div ref={ref} className={cn("relative w-full", view !== "chart" && "hidden")} style={{ height: H }}>
+        <div ref={ref} className={cn("relative w-full overflow-hidden", view !== "chart" && "hidden")} style={{ height: H }}>
             <svg
               width={width}
               height={H}

@@ -466,7 +466,7 @@ export function VoiceDemo() {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto grid max-w-[1440px] gap-4 p-4 md:p-6 xl:grid-cols-12">
+      <main className="relative z-10 mx-auto grid max-w-[1440px] grid-cols-[minmax(0,1fr)] gap-4 p-4 md:p-6 xl:grid-cols-12">
         {/* Left: agent + suggestions */}
         <aside className="order-3 flex flex-col gap-4 xl:order-1 xl:col-span-3">
           <div className="rounded-xl border border-border bg-card/70 p-4 backdrop-blur">

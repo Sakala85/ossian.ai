@@ -147,7 +147,12 @@ export default function OverviewPage() {
 
         <div className="grid gap-4 md:gap-5 xl:grid-cols-3">
           <div className="min-w-0 xl:col-span-2">
-            <Heatmap grid={getHeatmap()} />
+            <Heatmap
+              grid={getHeatmap()}
+              total={Math.round((kpis.calls * 28) / 30)}
+              share={kpis.afterHours / kpis.calls}
+              perDay={Math.round(kpis.afterHours / 30)}
+            />
           </div>
           <Card>
             <CardHeader>

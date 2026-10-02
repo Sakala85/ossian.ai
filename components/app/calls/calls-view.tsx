@@ -187,7 +187,7 @@ export function CallsView({ calls, now, initialId }: { calls: CallRecord[]; now:
                   <th className="px-3 py-2.5 font-medium">Site</th>
                   <th className="py-2.5 pr-4 pl-3 text-center font-medium">
                     <span className="sr-only">Sentiment</span>
-                    <span aria-hidden>Ton</span>
+                    <span aria-hidden>Ressenti</span>
                   </th>
                 </tr>
               </thead>
