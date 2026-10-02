@@ -1,7 +1,9 @@
 # Ossian — Architecture & choix techniques
 
 > Document de travail : il décrit ce qui est construit dans ce dépôt, l'architecture cible pour la production
-> et **les décisions à prendre ensemble** (section 6). Les chiffres de coûts sont des ordres de grandeur à valider.
+> et **les décisions techniques** (section 6). Les chiffres de coûts sont des ordres de grandeur à valider.
+>
+> **Décidé :** téléphonie via **Vapi** (région UE) pour les pilotes — mise en place pas à pas dans [`docs/VAPI.md`](VAPI.md).
 
 ## 1. Le produit en une phrase
 
@@ -22,7 +24,9 @@ résumés, KPI, CA généré).
 | Tableau de bord | `/app/*` | ✅ données de démonstration réalistes |
 | Moteur conversationnel | `lib/agent/*`, `POST /api/agent` | ✅ prompt, 8 outils métier, boucle d'outils streamée |
 | Analyse de site | `lib/onboarding/*`, `POST /api/onboarding/analyze` | ✅ |
-| Téléphonie (adapter Vapi) | `POST /api/voice/vapi`, `POST /api/voice/llm/chat/completions` | 🟡 squelette prêt, à brancher |
+| **Téléphonie Vapi** | `POST /api/voice/vapi`, `POST /api/voice/llm/chat/completions` | ✅ prêt, à brancher sur un numéro ([guide](VAPI.md)) |
+| Mode pilote (vrais appels sans DMS) | `lib/agent/pilot-backend.ts`, `lib/server/notify.ts` | ✅ demandes de RDV, leads, rappels envoyés à l'équipe (Slack/Teams/Make…) |
+| Script de configuration Vapi | `npm run vapi -- check \| numbers \| connect \| import-vonage` | ✅ |
 | Voix premium (démo) | `POST /api/tts` | 🟡 activée si `ELEVENLABS_API_KEY` |
 | Schéma base de données | `supabase/migrations/0001_init.sql` | 🟡 prêt, non déployé |
 
@@ -47,9 +51,16 @@ lib/
   agent/runtime.ts            boucle Claude streamée + exécution des outils
   agent/simulated.ts          agent à règles (démo sans clé API)
   onboarding/analyze.ts       extraction du profil (Claude + web_fetch/web_search)
+  agent/pilot-backend.ts      backend « vrais appels » sans DMS : rien n'est promis, tout est notifié
   voice/speech.ts             reconnaissance + synthèse vocale navigateur (démo)
-  voice/vapi.ts               adapter téléphonie
+  voice/vapi.ts               adapter Vapi (assistant transitoire, flux SSE compatible OpenAI)
+  voice/call-session.ts       mémoire de l'appel (historique Claude complet par call id)
+  server/dealerships.ts       numéro appelé → concession (KV, config/dealerships.json, sinon démo)
+  server/store.ts             KV : Upstash Redis (REST) ou mémoire
+  server/notify.ts            notifications équipe (webhook Slack/Teams/Make/Zapier)
   demo/*                      données de démonstration
+config/dealerships.json       registre numéro → profil pour les pilotes (sans base de données)
+scripts/vapi.mjs              configuration Vapi en ligne de commande (npm run vapi)
 supabase/migrations/          schéma Postgres multi-tenant + RLS
 ```
 
@@ -78,8 +89,30 @@ supabase/migrations/          schéma Postgres multi-tenant + RLS
 ```
 
 **Principe clé : le "cerveau" (prompt, outils, connecteurs) vit dans notre code**, indépendamment du fournisseur
-voix. On peut démarrer vite sur une plateforme managée puis migrer vers une stack auto-hébergée (Pipecat ou
-LiveKit Agents + Twilio/Telnyx SIP) quand le volume le justifie, sans réécrire l'agent.
+voix. On démarre sur Vapi puis on pourra migrer vers une stack auto-hébergée (Pipecat ou LiveKit Agents + Vonage,
+Twilio ou Telnyx en WebSocket/SIP) quand le volume le justifie, sans réécrire l'agent.
+
+### Déroulé d'un appel avec Vapi
+
+1. L'appel arrive sur le numéro Ossian (renvoi depuis la ligne de la concession). Vapi envoie `assistant-request`
+   à `/api/voice/vapi` ; on répond en < 7,5 s avec un **assistant transitoire** construit depuis le profil de la
+   concession : message d'accueil, voix ElevenLabs Flash v2.5, transcription Deepgram Nova-3 (`multi`), outils
+   Vapi `transferCall` (numéros des services) et `endCall`. Si Ossian ne répond pas, Vapi bascule sur le
+   **numéro de secours** (l'accueil de la concession).
+2. À chaque tour de parole, Vapi appelle `/api/voice/llm/chat/completions` (format OpenAI). On recharge
+   **l'historique Claude complet de l'appel** (outils et résultats compris), on n'ajoute que la nouvelle phrase
+   de l'appelant, puis Claude répond en streaming ; les outils métier s'exécutent chez nous.
+3. Pour transférer ou raccrocher, notre réponse se termine par un appel d'outil Vapi (`transferCall` avec le
+   numéro E.164 du service, ou `endCall`) : Vapi exécute l'action téléphonique.
+4. En fin d'appel, `end-of-call-report` : résumé, transcription et enregistrement envoyés à l'équipe.
+
+### Mode pilote : vrais appels sans DMS
+
+Tant qu'aucun connecteur DMS/CRM n'est actif, `PilotBackend` garantit qu'Ossian **ne promet jamais ce que la
+concession n'a pas vu** : les RDV deviennent des **demandes** confirmées par un conseiller (notifié
+instantanément), les leads et rappels sont poussés à l'équipe, et le statut d'atelier ou le stock (non connectés)
+se transforment en rappel plutôt qu'en réponse inventée. La concession de démo garde le backend simulé, sans
+transfert réel (ses numéros sont fictifs).
 
 ### Le moteur conversationnel (`lib/agent`)
 
@@ -109,24 +142,49 @@ LiveKit Agents + Twilio/Telnyx SIP) quand le volume le justifie, sans réécrire
 La même chaîne sert de **générateur de démo personnalisée** : avant un rendez-vous prospect, on colle l'URL de la
 concession et on arrive avec un agent qui connaît déjà ses horaires et ses services.
 
-## 4. Coûts unitaires (ordres de grandeur à valider)
+## 4. Coûts unitaires (ordres de grandeur, prix publics à confirmer)
 
-| Poste (par minute d'appel) | Plateforme managée | Auto-hébergé |
+Par minute d'appel, en $ :
+
+| Poste | Vapi + opérateur (choix actuel) | Opérateur (Vonage…) + pipeline maison |
 |---|---|---|
-| Téléphonie entrante FR | ~0,01 € | ~0,01 € |
-| STT streaming | ~0,01 € | ~0,01 € |
-| TTS (voix neurale) | 0,03–0,06 € | 0,03–0,06 € |
-| LLM (Claude, prompt en cache) | 0,02–0,04 € | 0,02–0,04 € |
-| Frais plateforme voix | ~0,05 € | 0 (+ serveurs) |
-| **Total** | **≈ 0,12–0,17 €/min** | **≈ 0,07–0,12 €/min** |
+| Orchestration voix | 0,05 (frais Vapi) | 0 (+ serveurs ≈ 100–300 €/mois au total) |
+| Téléphonie FR entrante | ≈ 0,01 | ≈ 0,01–0,015 (jambe WebSocket comprise) |
+| Transcription (Deepgram) | ≈ 0,01 | ≈ 0,01 |
+| Synthèse vocale (ElevenLabs) | 0,03–0,06 | 0,03–0,06 |
+| LLM Claude | voir ci-dessous | voir ci-dessous |
+| **Total avec Sonnet 5.5** | **≈ 0,12–0,18** | **≈ 0,07–0,12** |
 
-Avec un appel moyen de ~2 min et ~1 500 appels/mois/site : ≈ 3 000 min → 360–510 € de coûts variables pour un
-forfait de 490 €/site incluant 1 200 min + minutes supplémentaires à 0,25 €. **Le modèle de prix est à arbitrer
-ensemble** (forfait + minutes, ou part variable au RDV/lead généré).
+Le LLM pèse directement sur la marge (≈ 6 requêtes/min, prompt système en cache) :
+
+| Modèle | Prix (entrée / sortie, par M tokens) | ≈ $/min d'appel |
+|---|---|---|
+| Claude Opus 5.5 (défaut actuel, effort bas) | 4 $ / 20 $ | 0,04–0,07 |
+| Claude Sonnet 5.5 | 2 $ / 10 $ | 0,02–0,035 |
+| Claude Haiku 4.5 | 1 $ / 5 $ | 0,01–0,02 |
+
+Le choix se fera après un **test de latence et de qualité sur de vrais appels** (variable `OSSIAN_AGENT_MODEL`).
+
+**Exemple — un site à ~1 000 appels/mois (≈ 2 000 min)**, forfait Performance 490 € (1 200 min incluses)
++ 800 min × 0,25 € ≈ **690 € facturés** :
+
+| | Coût variable | Marge brute |
+|---|---|---|
+| Vapi | ≈ 250–330 € | ≈ 50–60 % |
+| Pipeline maison | ≈ 150–220 € | ≈ 70 % |
+
+Au-delà de **~20 à 50 sites** (≈ 5 000 €/mois d'écart à 50 sites), la migration vers un pipeline maison hébergé
+en France se justifie (≈ 1 mois de développement). Vonage AI Studio (outil no-code, plan Advanced à 1 100 $/mois)
+n'est pas adapté : le cerveau de l'agent doit rester le nôtre.
 
 ## 5. Sécurité, RGPD, conformité
 
 - Hébergement UE (Supabase Francfort/Paris, fonctions Vercel `cdg1`), chiffrement au repos et en transit, RLS par organisation.
+- **Vapi en région UE** (`dashboard.eu.vapi.ai`, `api.eu.vapi.ai`, `sip.eu.vapi.ai`, documentée par Vapi) : créer
+  l'organisation directement dans cette région (une organisation appartient à une seule région). À confirmer avec
+  Vapi à l'ouverture du compte : disponibilité de l'offre UE et parité de fonctionnalités avec la région US.
+- Endpoints téléphonie protégés par un secret partagé (`OSSIAN_VOICE_SECRET`, en-tête `x-ossian-key`), fermés en
+  production si le secret n'est pas défini.
 - RGPD : DPA client, durée de conservation des enregistrements configurable (90 j par défaut), export/suppression.
 - **AI Act (transparence)** : l'agent se présente comme assistante virtuelle ; mention de l'enregistrement en début d'appel.
 - Appels sortants : distinguer les rappels de service aux clients existants du démarchage commercial ; vérifier le
@@ -139,11 +197,11 @@ ensemble** (forfait + minutes, ou part variable au RDV/lead généré).
 | # | Sujet | Options | Recommandation |
 |---|---|---|---|
 | 1 | Périmètre | Auto uniquement (comme Sandra) · multi-verticales | **Auto d'abord**, le modèle de données reste générique |
-| 2 | Plateforme voix | Vapi · Retell · ElevenLabs Agents · Pipecat/LiveKit auto-hébergé | **Vapi pour les pilotes** (adapter prêt), auto-hébergé à partir de ~50 sites |
+| 2 | Plateforme voix | Vapi · Retell · ElevenLabs Agents · Pipecat/LiveKit auto-hébergé | ✅ **Décidé : Vapi (région UE)** pour les pilotes ; pipeline maison à partir de ~20–50 sites |
 | 3 | LLM | Claude Opus 5.5 (effort bas) · Sonnet 5.5 · Haiku 4.5 | Démarrer sur Opus 5.5, **benchmark de latence sur appels réels** avant de figer |
 | 4 | Voix (TTS) | ElevenLabs · Cartesia · Azure Neural | **ElevenLabs** (meilleure qualité FR), voix maison à créer |
 | 5 | Transcription (STT) | Deepgram Nova-3 · Gladia (FR) · Speechmatics | Benchmark sur accents, bruit d'atelier et **épellation d'immatriculations** |
-| 6 | Téléphonie | Numéros Vapi · Twilio · Telnyx · SIP client | Twilio/Telnyx + **pool de numéros FR pré-provisionnés** |
+| 6 | Opérateur (numéros FR sous Vapi) | Vonage · Twilio · Telnyx · trunk SIP d'un opérateur français | Vonage ou Twilio (import natif dans Vapi) + **pool de numéros FR pré-provisionnés** ; dossier réglementaire (Kbis, adresse) à prévoir |
 | 7 | Base & auth | Supabase (UE) · Neon + Clerk | **Supabase** (Postgres + Auth + Vault + RLS) |
 | 8 | Hébergement | Vercel Pro · AWS | **Vercel Pro** (le plan Hobby actuel est réservé à un usage non commercial) |
 | 9 | DMS prioritaires | Nextlane · Keyloop · Kerridge · CDK · incadea | **Selon vos premiers clients** — à lister ensemble |
@@ -153,9 +211,12 @@ ensemble** (forfait + minutes, ou part variable au RDV/lead généré).
 
 ## 7. Feuille de route proposée
 
-1. **Semaine 1–3 — Pilote réel** : Supabase (auth + persistance), Vapi + numéro FR, `/api/voice/*` branchés,
-   agenda Ossian intégré (sans DMS), récap e-mail après chaque appel, 1 à 3 concessions pilotes.
-2. **Semaine 4–8 — Intégrations** : premier connecteur DMS (selon clients), CRM, campagnes sortantes, Stripe,
-   multi-sites, alertes Slack/Teams.
-3. **Ensuite** : pipeline voix auto-hébergé (marge), WhatsApp, SSO, analytics avancés, amélioration continue
-   automatique du prompt à partir des transcriptions.
+1. **Maintenant — Premier numéro réel** : compte Vapi UE + opérateur, `OSSIAN_VOICE_SECRET` et
+   `ANTHROPIC_API_KEY` sur Vercel, `npm run vapi -- check` puis `connect` ([guide](VAPI.md)). Notifications de
+   l'équipe via un webhook Slack/Teams. Test interne, puis 1 à 3 concessions pilotes en renvoi sur non-réponse.
+2. **Semaines 2–4** : Supabase (auth + historique des appels dans le tableau de bord), Upstash Redis (mémoire
+   d'appel partagée), benchmark Opus / Sonnet / Haiku sur appels réels, SMS de confirmation.
+3. **Semaines 4–8 — Intégrations** : premier connecteur DMS (selon clients), CRM, campagnes sortantes, Stripe,
+   multi-sites.
+4. **Ensuite** : pipeline voix maison hébergé en France (marge, maîtrise des données), WhatsApp, SSO, analytics
+   avancés, amélioration continue automatique du prompt à partir des transcriptions.

@@ -1,57 +1,96 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import { DemoBackend } from "@/lib/agent/backend";
 import type { AgentEvent } from "@/lib/agent/events";
-import { runClaudeTurn } from "@/lib/agent/runtime";
-import { checkSecret, getDealershipByPhone } from "@/lib/server/dealerships";
+import { PilotBackend } from "@/lib/agent/pilot-backend";
+import { hasAnthropicKey, runClaudeTurn } from "@/lib/agent/runtime";
+import { runSimulatedTurn } from "@/lib/agent/simulated";
+import { getDealershipByPhone, isAuthorizedProvider, isDemoDealership } from "@/lib/server/dealerships";
+import { prepareTurn, saveTurn } from "@/lib/voice/call-session";
+import { toE164 } from "@/lib/voice/phone";
+import { sseChunker, type VapiLlmRequest } from "@/lib/voice/vapi";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-interface OpenAIStyleBody {
-  messages: { role: "system" | "user" | "assistant" | "tool"; content: string | null }[];
-  call?: { id?: string; customer?: { number?: string }; phoneNumber?: { number?: string } };
-}
-
 /**
- * OpenAI-compatible streaming endpoint consumed by Vapi's "custom-llm" provider.
- * Vapi owns the audio and sends the text transcript; we run Ossian's Claude
- * runtime (tools executed server-side) and stream the spoken answer back.
+ * OpenAI-compatible streaming endpoint used by Vapi's "custom-llm" provider
+ * (Vapi calls `${model.url}/chat/completions` on every caller turn).
+ *
+ * Vapi owns the audio; we run Ossian's agent (Claude + business tools executed
+ * here), stream the words to speak, and finish with a Vapi tool call when the
+ * call must be transferred (transferCall) or hung up (endCall).
  */
 export async function POST(req: Request) {
-  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!checkSecret(token, process.env.OSSIAN_LLM_SECRET)) return new Response("Unauthorized", { status: 401 });
+  if (!isAuthorizedProvider(req)) return new Response("Unauthorized", { status: 401 });
+  const body = (await req.json().catch(() => null)) as VapiLlmRequest | null;
+  if (!body?.messages) return new Response("Bad request", { status: 400 });
 
-  const body = (await req.json()) as OpenAIStyleBody;
-  const profile = await getDealershipByPhone(body.call?.phoneNumber?.number);
-
-  // Rebuild the conversation from the spoken transcript (text only).
-  const turns = body.messages.filter((m) => (m.role === "user" || m.role === "assistant") && m.content);
-  const lastUser = [...turns].reverse().find((m) => m.role === "user");
-  const prior = turns.slice(0, turns.lastIndexOf(lastUser!));
-  while (prior.length && prior[0]!.role !== "user") prior.shift(); // history must start with a user turn
-  const history: Anthropic.Beta.BetaMessageParam[] = prior.map((m) => ({ role: m.role as "user" | "assistant", content: m.content! }));
-
-  const encoder = new TextEncoder();
-  const id = `chatcmpl-${Date.now().toString(36)}`;
-  const chunk = (delta: Record<string, unknown>, finish: string | null = null) =>
-    encoder.encode(`data: ${JSON.stringify({ id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: "ossian-agent", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`);
+  const callId = body.call?.id;
+  const calledNumber = body.phoneNumber?.number ?? body.call?.phoneNumber?.number ?? body.metadata?.calledNumber;
+  const callerNumber = body.customer?.number ?? body.call?.customer?.number;
+  const profile = await getDealershipByPhone(calledNumber);
+  const backend = isDemoDealership(profile) ? new DemoBackend(profile) : new PilotBackend(profile, { callId, callerNumber });
+  const { history, userText, userTurns } = await prepareTurn(callId, body.messages);
+  const sse = sseChunker(body.model);
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      controller.enqueue(chunk({ role: "assistant" }));
+      controller.enqueue(sse.role());
+      let transferTo: string | null = null;
+      let hangUp = false;
+      let appended: NonNullable<Extract<AgentEvent, { type: "messages" }>["messages"]> = [];
+
       const emit = (e: AgentEvent) => {
-        if (e.type === "text") controller.enqueue(chunk({ content: e.delta }));
+        switch (e.type) {
+          case "text":
+            controller.enqueue(sse.text(e.delta));
+            break;
+          case "tool_result":
+            // Demo dealership numbers are fictional: the transfer stays verbal only.
+            if (e.name === "transfer_call" && e.ok && !isDemoDealership(profile)) {
+              const r = e.result as { status?: string; number?: string };
+              if (r.status === "transfert_en_cours") transferTo = toE164(r.number);
+            }
+            break;
+          case "end_call":
+            hangUp = true;
+            break;
+          case "messages":
+            appended = e.messages;
+            break;
+        }
       };
+
       try {
-        if (lastUser) await runClaudeTurn({ profile, history, userText: lastUser.content!, callerNumber: body.call?.customer?.number, emit, signal: req.signal });
+        if (!userText) {
+          controller.enqueue(sse.text("Je vous écoute."));
+        } else if (hasAnthropicKey()) {
+          await runClaudeTurn({ profile, history, userText, callerNumber, emit, signal: req.signal, backend });
+        } else {
+          await runSimulatedTurn({ profile, history, userText, emit, backend });
+        }
       } catch (err) {
-        console.error("[voice/llm]", err);
-        controller.enqueue(chunk({ content: "Je vais vous faire rappeler par un conseiller très rapidement." }));
+        if (!req.signal.aborted) {
+          console.error("[voice/llm]", err);
+          controller.enqueue(sse.text(" Excusez-moi, je vais vous faire rappeler très rapidement par un conseiller."));
+        }
       }
-      controller.enqueue(chunk({}, "stop"));
-      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+
+      await saveTurn(callId, { history: [...history, ...appended], userTurns });
+
+      if (transferTo) {
+        controller.enqueue(sse.toolCall("transferCall", { destination: transferTo }));
+        controller.enqueue(sse.finish("tool_calls"));
+      } else if (hangUp) {
+        controller.enqueue(sse.toolCall("endCall", {}));
+        controller.enqueue(sse.finish("tool_calls"));
+      } else {
+        controller.enqueue(sse.finish("stop"));
+      }
+      controller.enqueue(sse.done());
       controller.close();
     },
   });
-  return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-store" } });
+
+  return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-store", Connection: "keep-alive" } });
 }

@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { DealershipProfile } from "@/lib/domain/types";
-import { DemoBackend } from "./backend";
+import { DemoBackend, type AgentBackend } from "./backend";
 import type { Emit } from "./events";
 
 /**
@@ -96,8 +96,13 @@ export async function runSimulatedTurn(opts: {
   history: Anthropic.Beta.BetaMessageParam[];
   userText: string;
   emit: Emit;
+  /** Backend for the current utterance (e.g. PilotBackend on real calls). Defaults to the demo backend. */
+  backend?: AgentBackend;
 }) {
-  const backend = new DemoBackend(opts.profile);
+  // Earlier utterances are replayed to rebuild state: always on the side-effect-free demo
+  // backend, so real notifications only fire for what the caller just said.
+  const replay = new DemoBackend(opts.profile);
+  const live = (opts.backend ?? replay) as DemoBackend;
   const utterances = [
     ...opts.history.filter((m) => m.role === "user" && typeof m.content === "string").map((m) => m.content as string),
     opts.userText,
@@ -105,7 +110,7 @@ export async function runSimulatedTurn(opts: {
 
   const st: State = { lang: "fr" };
   let out: TurnOut = { text: "", tools: [] };
-  for (const raw of utterances) out = await step(st, raw, opts.profile, backend);
+  for (const [i, raw] of utterances.entries()) out = await step(st, raw, opts.profile, i === utterances.length - 1 ? live : replay);
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   let i = 0;
@@ -200,6 +205,9 @@ async function step(st: State, raw: string, p: DealershipProfile, be: DemoBacken
       const r = await be.bookAppointment({ customer_name: st.name, phone: st.phone, vehicle: st.vehicle, plate: st.plate, service: st.service, slot_id: st.slot.slot_id, courtesy_vehicle: st.courtesy });
       tools.push({ name: "book_appointment", input: { customer_name: st.name, phone: st.phone, vehicle: st.vehicle, service: st.service, slot_id: st.slot.slot_id, courtesy_vehicle: st.courtesy ?? false }, result: r });
       st.done = true;
+      if ((r as { status?: string }).status === "demande_enregistree") {
+        return { text: en ? `Your request for ${r.when} is registered; an advisor will confirm it by text shortly. Anything else?` : `C'est noté : votre demande de rendez-vous pour ${r.when} est enregistrée, un conseiller vous la confirme très vite par SMS. Puis-je faire autre chose pour vous ?`, tools };
+      }
       return { text: en ? `You're booked ${r.when} with ${r.advisor}. You'll get a confirmation text. Anything else?` : `C'est confirmé : ${r.when} avec ${r.advisor}${st.courtesy ? ", avec un véhicule de courtoisie" : ""}. Vous allez recevoir un SMS de confirmation. Puis-je faire autre chose pour vous ?`, tools };
     }
 
@@ -230,6 +238,7 @@ async function step(st: State, raw: string, p: DealershipProfile, be: DemoBacken
       const r = await be.createLead({ name: st.name, phone: st.phone, interest: /occasion/.test(t) ? "VO" : "VN", vehicle_of_interest: st.vehicle, test_drive_slot_id: st.slot?.slot_id });
       tools.push({ name: "create_lead", input: { name: st.name, phone: st.phone, interest: "VN", vehicle_of_interest: st.vehicle, test_drive_slot_id: st.slot?.slot_id }, result: r });
       st.done = true;
+      if (!r.assignee) return { text: `C'est noté : un vendeur vous rappelle très vite pour confirmer l'essai ${st.slot?.label ?? ""}. Autre chose ?`, tools };
       return { text: `C'est réservé : ${r.assignee} vous attendra ${st.slot?.label} pour l'essai. Vous recevrez un SMS récapitulatif. Autre chose ?`, tools };
     }
 

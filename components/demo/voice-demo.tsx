@@ -413,6 +413,15 @@ export function VoiceDemo() {
     hangup();
   };
 
+  const exportProfile = () => {
+    const blob = new Blob([JSON.stringify(profile, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `ossian-profil-${profile.id || "concession"}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+
   const resetProfile = () => {
     clearProfile();
     setProfile(DEMO_PROFILE);
@@ -491,7 +500,14 @@ export function VoiceDemo() {
                 </span>
               ))}
             </div>
-            {custom && <p className="mt-3 text-[12px] text-primary">Profil personnalisé généré par l&apos;onboarding.</p>}
+            {custom && (
+              <div className="mt-3 flex items-center justify-between gap-2 text-[12px]">
+                <span className="text-primary">Profil personnalisé généré par l&apos;onboarding.</span>
+                <button onClick={exportProfile} className="shrink-0 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline" title="Pour rattacher ce profil à un numéro (npm run vapi -- connect … --profile)">
+                  Exporter (JSON)
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="rounded-xl border border-border bg-card/70 p-4 backdrop-blur">

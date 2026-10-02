@@ -32,6 +32,12 @@ Dans Vercel → projet `ossian-ai` → *Settings → Environment Variables*, ajo
 (et optionnellement `ELEVENLABS_API_KEY` pour la voix premium), puis redéployez. Le badge de `/demo` passe
 de « Mode simulé » à « IA en direct ».
 
+## Téléphonie (Vapi)
+
+Ossian répond sur de vrais numéros via **Vapi** (région UE). Mise en service pas à pas :
+[`docs/VAPI.md`](docs/VAPI.md) — en résumé : `OSSIAN_VOICE_SECRET` sur Vercel, puis
+`npm run vapi -- check` et `npm run vapi -- connect <phoneNumberId> --fallback +33…`.
+
 ## Stack
 
 Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Motion · Anthropic SDK (Claude) · Zod ·
@@ -41,4 +47,6 @@ Supabase (schéma prêt) · Vapi (adapter téléphonie) · déployé sur Vercel.
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — architecture, onboarding automatisé, coûts, conformité,
   **décisions techniques à prendre ensemble** et feuille de route.
+- [`docs/VAPI.md`](docs/VAPI.md) — brancher un vrai numéro (Vapi + opérateur), mode pilote, renvoi d'appel.
+- [`docs/DEMO.md`](docs/DEMO.md) — déroulé de démo chez un prospect.
 - [`docs/DESIGN.md`](docs/DESIGN.md) — design system.
