@@ -23,6 +23,8 @@ export interface AnalysisState {
   profile?: DealershipProfile;
   mode?: "ai" | "simulated";
   error?: string;
+  /** Why the automatic analysis did not run (starter profile). */
+  reason?: string;
 }
 
 const TIMEOUT_MS = 150_000;
@@ -125,6 +127,7 @@ export function useAnalyze() {
           doneAt: Date.now(),
           profile: ev.profile,
           mode: ev.mode,
+          reason: ev.reason,
           steps: Object.fromEntries(
             Object.entries(s.steps).map(([k, v]) => [k, { ...v, status: "done" as StepStatus }]),
           ) as AnalysisState["steps"],

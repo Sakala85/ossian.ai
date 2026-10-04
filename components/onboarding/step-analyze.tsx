@@ -200,9 +200,16 @@ export function StepAnalyze({
                       Rien n&apos;est inventé : seuls le nom et le site sont pré-remplis. Ajoutez vos horaires, vos prestations et les numéros
                       de vos services pour que {profile.agent.name || "votre agent"} réponde juste.
                     </p>
+                    {analysis.reason && <p className="mt-2 text-xs text-muted-foreground">Cause : {analysis.reason}.</p>}
                   </div>
                 </div>
-                <div className="mt-5 flex justify-end">
+                <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+                  {analysis.status === "done" && (
+                    <Button variant="ghost" onClick={onRetry}>
+                      <RotateCcw />
+                      Réessayer l&apos;analyse
+                    </Button>
+                  )}
                   <Button onClick={onCustomize} className="w-full sm:w-auto">
                     Compléter mes informations
                     <ArrowRight className="size-4" />

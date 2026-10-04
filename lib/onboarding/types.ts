@@ -6,7 +6,13 @@ import type { DealershipProfile } from "@/lib/domain/types";
  */
 export type AnalyzeEvent =
   | { type: "step"; id: AnalyzeStepId; status: "running" | "done"; detail?: string }
-  | { type: "profile"; profile: DealershipProfile; mode: "ai" | "simulated" }
+  | {
+      type: "profile";
+      profile: DealershipProfile;
+      mode: "ai" | "simulated";
+      /** Starter profile only: why the automatic analysis did not run, in plain French. */
+      reason?: string;
+    }
   | { type: "error"; message: string };
 
 export type AnalyzeStepId = "fetch" | "identity" | "hours" | "services" | "routing" | "agent";

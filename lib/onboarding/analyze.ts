@@ -2,9 +2,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { DEMO_PROFILE } from "@/lib/demo/profile";
 import type { DealershipProfile, DepartmentKey } from "@/lib/domain/types";
+import { cleanModel } from "@/lib/agent/runtime";
+import { STARTER_DEPARTMENTS, STARTER_POLICY } from "./simulate";
 import type { AnalyzeEvent, AnalyzeStepId } from "./types";
 
-const MODEL = process.env.OSSIAN_ONBOARDING_MODEL || "claude-opus-5-5";
+export const ONBOARDING_MODEL = cleanModel(process.env.OSSIAN_ONBOARDING_MODEL);
+const MODEL = ONBOARDING_MODEL;
 const DEPARTMENT_KEYS = ["apres_vente", "vn", "vo", "pieces", "carrosserie", "accueil", "comptabilite"] as const;
 
 const ProfileInput = z.object({
@@ -83,7 +86,7 @@ const SYSTEM = `Tu configures l'agent vocal d'une concession ou d'un garage auto
 Méthode :
 1. Lis la page fournie avec web_fetch, puis 2 à 5 pages internes utiles (contact, horaires, atelier/entretien, occasions, sites/concessions, mentions légales). Utilise web_search seulement si une information clé manque (adresse, horaires).
 2. Extrais : nom commercial, groupe, marques distribuées, sites (adresse, ville, téléphone), horaires par service, prestations atelier (avec prix « à partir de » s'ils sont affichés), services joignables (atelier, VN, VO, pièces, carrosserie, comptabilité) avec téléphones/e-mails, politiques utiles (véhicule de courtoisie, moyens de paiement, garanties), et 3 à 6 questions fréquentes.
-3. N'invente pas de coordonnées : laisse une chaîne vide si un téléphone ou une adresse est introuvable. Pour les prestations et durées non affichées, propose des valeurs standard d'un atelier français (révision 120 min, vidange 60 min, diagnostic 45 min, freinage 90 min, pneumatiques 45 min, climatisation 60 min).
+3. N'invente rien : laisse une chaîne vide si un téléphone, une adresse ou un horaire est introuvable, et ne liste que les prestations mentionnées sur le site. Seule la durée d'une prestation peut être estimée quand elle n'est pas affichée (révision 120 min, vidange 60 min, diagnostic 45 min, freinage 90 min, pneumatiques 45 min, climatisation 60 min). N'indique un prix que s'il est affiché.
 4. Termine en appelant submit_profile une seule fois. Rédige en français.`;
 
 export async function analyzeWithClaude(url: URL, nameHint: string | undefined, emit: (e: AnalyzeEvent) => void, signal?: AbortSignal): Promise<DealershipProfile> {
@@ -154,26 +157,25 @@ export async function analyzeWithClaude(url: URL, nameHint: string | undefined, 
 function toProfile(d: z.infer<typeof ProfileInput>, url: URL, nameHint: string | undefined, emit: (e: AnalyzeEvent) => void): DealershipProfile {
   const name = nameHint?.trim() || d.name;
   emit({ type: "step", id: "identity", status: "done", detail: `${d.brands.length} marque(s) · ${d.sites.length} site(s)` });
-  const fallback = DEMO_PROFILE;
-  const departments = d.departments.length
-    ? d.departments
-    : fallback.departments.map((x) => ({ ...x, phone: d.sites[0]?.phone ?? "", email: undefined }));
+  // Only what was found on the site: missing hours, services or services' numbers stay empty to fill in.
+  const departments = d.departments.length ? d.departments : STARTER_DEPARTMENTS.map((x) => ({ ...x, phone: d.sites[0]?.phone ?? "" }));
   return {
     id: `p_${url.hostname.replace(/^www\./, "").split(".")[0]}`,
     name,
     group: d.group,
     website: url.origin,
     description: d.description,
-    brands: d.brands.length ? d.brands : ["Toutes marques"],
+    brands: d.brands,
     sites: (d.sites.length ? d.sites : [{ name, address: "", city: "", phone: "", brands: d.brands }]).map((s, i) => ({ id: `site-${i + 1}`, ...s })),
-    hours: d.hours.length ? d.hours : fallback.hours,
-    services: d.services.length ? d.services : fallback.services,
+    hours: d.hours,
+    services: d.services,
     departments: departments.map((x) => ({ ...x, key: x.key as DepartmentKey })),
-    policies: d.policies,
+    policies: d.policies.length ? d.policies : [STARTER_POLICY],
     faq: d.faq,
     agent: {
-      ...fallback.agent,
-      greeting: `${name} bonjour, je suis ${fallback.agent.name}, l'assistante de la concession. Comment puis-je vous aider ?`,
+      ...DEMO_PROFILE.agent,
+      smsConfirmation: false,
+      greeting: `${name} bonjour, je suis ${DEMO_PROFILE.agent.name}, l'assistante de la concession. Comment puis-je vous aider ?`,
     },
   };
 }

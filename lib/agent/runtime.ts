@@ -10,7 +10,12 @@ import { AGENT_TOOLS, executeTool } from "./tools";
  * (fast, short spoken turns). Override with OSSIAN_AGENT_MODEL to benchmark
  * latency/cost alternatives for production voice traffic.
  */
-export const AGENT_MODEL = process.env.OSSIAN_AGENT_MODEL || "claude-opus-5-5";
+export const AGENT_MODEL = cleanModel(process.env.OSSIAN_AGENT_MODEL);
+
+/** Model id from an environment variable, tolerant of stray spaces or quotes; Claude Opus 5.5 by default. */
+export function cleanModel(value: string | undefined) {
+  return value?.trim().replace(/^["']+|["']+$/g, "").trim() || "claude-opus-5-5";
+}
 
 const MAX_STEPS = 8;
 
